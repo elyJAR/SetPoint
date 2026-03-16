@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SetPoint</title>
+  <style>
+    /* ── Reset & Base ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      font-size: 14px;
+      background: #f4f5f7;
+      color: #1a1d23;
+      min-height: 100vh;
+    }
+
+    /* ── Layout ── */
+    .app-wrapper {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 0 24px 48px;
+    }
+
+    /* ── Header ── */
+    .app-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 20px 0 18px;
+      border-bottom: 2px solid #d0d4dc;
+      margin-bottom: 28px;
+    }
+    .app-title {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      color: #1a1d23;
+    }
+    .app-title span {
+      color: #2563eb;
+    }
+    .app-subtitle {
+      font-size: 12px;
+      color: #6b7280;
+      margin-top: 2px;
+      font-weight: 400;
+      letter-spacing: 0.02em;
+    }
+    .header-actions { display: flex; gap: 10px; }
+
+    /* ── Buttons ── */
+    button, .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 16px;
+      border-radius: 5px;
+      border: 1px solid transparent;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s, opacity 0.15s;
+      white-space: nowrap;
+    }
+    .btn-primary {
+      background: #2563eb;
+      color: #fff;
+      border-color: #2563eb;
+    }
+    .btn-primary:hover { background: #1d4ed8; border-color: #1d4ed8; }
+    .btn-secondary {
+      background: #fff;
+      color: #374151;
+      border-color: #d1d5db;
+    }
+    .btn-secondary:hover { background: #f9fafb; border-color: #9ca3af; }
+    .btn-danger {
+      background: #fff;
+      color: #dc2626;
+      border-color: #fca5a5;
+    }
+    .btn-danger:hover { background: #fef2f2; }
+    .btn-sm { padding: 5px 10px; font-size: 12px; }
+    button:disabled, button[disabled] {
+      opacity: 0.45;
+      cursor: not-allowed;
+      pointer-events: none;
+    }
+
+    /* ── Cards / Sections ── */
+    .card {
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 24px;
+      margin-bottom: 20px;
+    }
+    .card-title {
+      font-size: 13px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: #6b7280;
+      margin-bottom: 16px;
+    }
+
+    /* ── Form ── */
+    .form-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 0;
+      border-bottom: 1px solid #f3f4f6;
+    }
+    .form-row:last-child { border-bottom: none; }
+    .form-row input[type="text"],
+    .form-row input[type="number"] {
+      height: 36px;
+      padding: 0 10px;
+      border: 1px solid #d1d5db;
+      border-radius: 5px;
+      font-size: 13px;
+      color: #1a1d23;
+      background: #fafafa;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .form-row input[type="text"]:focus,
+    .form-row input[type="number"]:focus {
+      outline: none;
+      border-color: #2563eb;
+      box-shadow: 0 0 0 3px rgba(37,99,235,0.12);
+      background: #fff;
+    }
+    .input-label { width: 160px; }
+    .input-casting-date { width: 130px; }
+    .input-custom-duration { width: 110px; }
+    .extra-durations {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-items: center;
+    }
+    .extra-durations .input-custom-duration { width: 110px; }
+    .checkbox-group {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .checkbox-label {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 13px;
+      color: #374151;
+      cursor: pointer;
+      user-select: none;
+    }
+    .checkbox-label input[type="checkbox"] {
+      width: 15px;
+      height: 15px;
+      accent-color: #2563eb;
+      cursor: pointer;
+    }
+    .form-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 18px;
+      padding-top: 16px;
+      border-top: 1px solid #f3f4f6;
+    }
+
+    /* ── Import Panel ── */
+    .import-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 14px;
+    }
+    .import-row label {
+      font-size: 13px;
+      color: #374151;
+      font-weight: 500;
+    }
+    input[type="file"] {
+      font-size: 13px;
+      color: #374151;
+      cursor: pointer;
+    }
+    .link-btn {
+      font-size: 13px;
+      color: #2563eb;
+      text-decoration: none;
+      font-weight: 500;
+      padding: 6px 0;
+      border-bottom: 1px dashed #93c5fd;
+      transition: color 0.15s;
+    }
+    .link-btn:hover { color: #1d4ed8; border-bottom-color: #2563eb; }
+
+    /* ── Banner ── */
+    #banner-container { margin-bottom: 16px; }
+    .banner {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 16px;
+      border-radius: 6px;
+      border: 1px solid transparent;
+      font-size: 13px;
+      margin-bottom: 8px;
+      line-height: 1.5;
+    }
+    .banner--error   { background: #fef2f2; border-color: #fca5a5; color: #991b1b; }
+    .banner--warning { background: #fffbeb; border-color: #fcd34d; color: #92400e; }
+    .banner--info    { background: #eff6ff; border-color: #93c5fd; color: #1e40af; }
+    .banner-dismiss {
+      background: none;
+      border: none;
+      font-size: 18px;
+      line-height: 1;
+      cursor: pointer;
+      color: inherit;
+      opacity: 0.6;
+      padding: 0 2px;
+      flex-shrink: 0;
+    }
+    .banner-dismiss:hover { opacity: 1; }
+
+    /* ── Schedule Table ── */
+    .schedule-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    .schedule-table thead tr {
+      background: #f8f9fb;
+    }
+    .schedule-table th {
+      text-align: left;
+      padding: 10px 14px;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #6b7280;
+      border-bottom: 2px solid #e5e7eb;
+      white-space: nowrap;
+    }
+    .schedule-table td {
+      padding: 10px 14px;
+      border-bottom: 1px solid #f3f4f6;
+      vertical-align: middle;
+    }
+    .schedule-table tbody tr:last-child td { border-bottom: none; }
+    .schedule-table tbody tr:hover { background: #f9fafb; }
+
+    /* ── Next Crush Countdown ── */
+    .next-crush-card {
+      background: linear-gradient(135deg, #1e40af 0%, #2563eb 100%);
+      color: #fff;
+      border-radius: 8px;
+      padding: 28px 32px;
+      margin-bottom: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+    }
+    .next-crush-card .card-title {
+      color: rgba(255,255,255,0.7);
+      margin-bottom: 12px;
+    }
+    .next-crush-number {
+      font-size: 64px;
+      font-weight: 800;
+      line-height: 1;
+      letter-spacing: -2px;
+      margin-bottom: 10px;
+    }
+    .next-crush-sub {
+      font-size: 14px;
+      color: rgba(255,255,255,0.85);
+      font-weight: 400;
+    }
+
+    /* ── Days Left ── */
+    .days-left {
+      font-weight: 600;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+    .days-left--future { color: #2563eb; }
+    .days-left--today  { color: #16a34a; }
+    .days-left--past   { color: #dc2626; }
+
+    /* ── Row Status ── */
+    tr.row--past   { background: #fff5f5; }
+    tr.row--past:hover { background: #fee2e2; }
+    tr.row--today  { background: #f0fdf4; }
+    tr.row--today:hover { background: #dcfce7; }
+    tr.row--future { background: #fff; }
+
+    /* ── Empty State ── */
+    .empty-state {
+      text-align: center;
+      padding: 40px 20px;
+      color: #9ca3af;
+      font-size: 14px;
+    }
+
+    /* ── Inline Edit ── */
+    .inline-edit {
+      padding: 12px 14px;
+      background: #f8f9fb;
+    }
+    .inline-edit label {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-right: 12px;
+      font-size: 13px;
+    }
+    .inline-edit input {
+      height: 32px;
+      padding: 0 8px;
+      border: 1px solid #d1d5db;
+      border-radius: 4px;
+      font-size: 13px;
+    }
+    .btn-confirm-edit {
+      background: #2563eb;
+      color: #fff;
+      border: none;
+      padding: 6px 14px;
+      border-radius: 4px;
+      font-size: 13px;
+      cursor: pointer;
+      margin-right: 6px;
+    }
+    .btn-cancel-edit {
+      background: #fff;
+      color: #374151;
+      border: 1px solid #d1d5db;
+      padding: 6px 14px;
+      border-radius: 4px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div class="app-wrapper">
+
+    <!-- Header -->
+    <header class="app-header">
+      <div>
+        <div class="app-title">Set<span>Point</span></div>
+        <div class="app-subtitle">Concrete Curing Schedule Tracker</div>
+      </div>
+      <div class="header-actions">
+        <button id="btn-export-csv" class="btn btn-secondary" disabled>
+          &#8595; Export CSV
+        </button>
+        <button id="btn-export-pdf" class="btn btn-secondary" disabled>
+          &#8595; Export PDF
+        </button>
+      </div>
+    </header>
+
+    <!-- Banner container (populated by showBanner) -->
+    <div id="banner-container"></div>
+
+    <!-- Next Crush Countdown -->
+    <section id="next-crush-section" class="next-crush-card" style="display:none">
+      <div class="card-title">Next Crushing Date</div>
+      <div id="next-crush-container"></div>
+    </section>
+
+    <!-- Entry Form -->
+    <section class="card">
+      <div class="card-title">Add Samples</div>
+      <form id="sample-form" novalidate>
+        <div id="form-rows">
+          <!-- Initial form row -->
+          <div class="form-row" data-index="0">
+            <input
+              type="text"
+              class="input-label"
+              name="sample_label_0"
+              placeholder="Sample label e.g. Beam-01"
+              aria-label="Sample label"
+            />
+            <input
+              type="text"
+              class="input-casting-date"
+              name="casting_date_0"
+              placeholder="DD/MM/YYYY"
+              aria-label="Casting date"
+            />
+            <div class="checkbox-group">
+              <label class="checkbox-label"><input type="checkbox" class="duration-checkbox" value="7" /> 7d</label>
+              <label class="checkbox-label"><input type="checkbox" class="duration-checkbox" value="14" /> 14d</label>
+              <label class="checkbox-label"><input type="checkbox" class="duration-checkbox" value="21" /> 21d</label>
+              <label class="checkbox-label"><input type="checkbox" class="duration-checkbox" value="28" /> 28d</label>
+              <label class="checkbox-label"><input type="checkbox" class="duration-checkbox" value="56" /> 56d</label>
+              <label class="checkbox-label"><input type="checkbox" class="duration-checkbox" value="90" /> 90d</label>
+            </div>
+            <button type="button" class="btn-remove-row btn btn-danger btn-sm" style="display:none" aria-label="Remove this row">
+              Remove
+            </button>
+          </div>
+        </div>
+        <div class="form-actions">
+          <button type="button" id="btn-add-row" class="btn btn-secondary">+ Add Another Row</button>
+          <button type="submit" class="btn btn-primary">Submit</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- Import Panel -->
+    <section class="card">
+      <div class="card-title">Import / Export</div>
+      <div class="import-row">
+        <label for="csv-file-input">Import CSV:</label>
+        <input type="file" id="csv-file-input" accept=".csv" />
+        <a href="#" id="btn-download-template" class="link-btn">Download Template</a>
+      </div>
+    </section>
+
+    <!-- Schedule Table -->
+    <section class="card">
+      <div class="card-title">Crush Schedule</div>
+      <div id="schedule-container">
+        <p class="empty-state">No samples yet. Add a sample above to get started.</p>
+      </div>
+    </section>
+
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
