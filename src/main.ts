@@ -153,13 +153,13 @@ function handleEdit(id: string): void {
   editTd.className = 'inline-edit';
 
   const castingDisplay = formatForEdit(row.casting_date);
-  editTd.innerHTML = `
-    <label>Label: <input type="text" class="edit-label" value="${escapeAttr(row.sample_label)}" /></label>
-    <label>Casting Date: <input type="text" class="edit-casting-date" value="${castingDisplay}" placeholder="DD/MM/YYYY" /></label>
-    <label>Curing Duration (days): <input type="number" class="edit-curing-duration" value="${row.curing_duration}" min="1" /></label>
-    <button type="button" class="btn-confirm-edit">Confirm</button>
-    <button type="button" class="btn-cancel-edit">Cancel</button>
-  `;
+  editTd.innerHTML = [
+    '<label>Label: <input type="text" class="edit-label" value="' + escapeAttr(row.sample_label) + '" /></label>',
+    '<label>Casting Date: <input type="text" class="edit-casting-date" value="' + castingDisplay + '" placeholder="DD/MM/YYYY" /></label>',
+    '<label>Curing Duration (days): <input type="number" class="edit-curing-duration" value="' + row.curing_duration + '" min="1" /></label>',
+    '<button type="button" class="btn-confirm-edit">Confirm</button>',
+    '<button type="button" class="btn-cancel-edit">Cancel</button>',
+  ].join('');
 
   const originalCells = Array.from(tr.children);
   while (tr.firstChild) tr.removeChild(tr.firstChild);
@@ -312,9 +312,9 @@ function init(): void {
 
   const csvFileInput = document.getElementById('csv-file-input') as HTMLInputElement | null;
   csvFileInput?.addEventListener('change', () => {
-    const file = csvFileInput.files?.[0];
-    if (file) {
-      handleCSVImport(file);
+    const f = csvFileInput.files?.[0];
+    if (f) {
+      handleCSVImport(f);
       csvFileInput.value = '';
     }
   });
