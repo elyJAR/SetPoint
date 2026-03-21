@@ -15,6 +15,7 @@
     "jspdf": "^2.5.1"
   },
   "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
     "@capacitor/cli": "^8.2.0",
     "@vitest/coverage-v8": "^1.6.0",
     "fast-check": "^3.19.0",

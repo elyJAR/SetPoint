@@ -1,0 +1,10 @@
+{
+  "icons": [
+    {
+      "src": "/setpoint_logo.svg",
+      "type": "image/svg+xml",
+      "sizes": "any",
+      "purpose": "any maskable"
+    }
+  ]
+}
