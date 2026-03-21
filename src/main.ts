@@ -5,7 +5,8 @@ import { parseCSV, generateCSV, generateTemplate } from './csv';
 import { generatePDF } from './pdf';
 import { renderTable, renderFormRow, showBanner, setExportButtonsDisabled, renderNextCrush, showInfoModal } from './ui';
 import { requestNotificationPermission, updateLocalNotifications } from './notifications';
-import { isFirebaseConfigured, loginWithGoogle, logout, onAuthChange, saveToCloud, loadFromCloud, getSharedSchedule, handleRedirectResult } from './firebase';
+import { isFirebaseConfigured, loginWithGoogle, logout, onAuthChange, saveToCloud, loadFromCloud, getSharedSchedule } from './firebase';
+import { Capacitor } from '@capacitor/core';
 
 let state: ScheduleRow[] = [];
 let currentUserUid: string | null = null;
@@ -358,8 +359,9 @@ async function init(): Promise<void> {
   await migrateFromLocalStorage();
   requestNotificationPermission();
 
-  if (isFirebaseConfigured) {
-    await handleRedirectResult().catch(console.error);
+  if (Capacitor.isNativePlatform()) {
+    const { GoogleAuth } = await import('@codetrix-studio/capacitor-google-auth');
+    GoogleAuth.initialize();
   }
 
   const params = new URLSearchParams(window.location.search);
