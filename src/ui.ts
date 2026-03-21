@@ -259,38 +259,46 @@ export function renderNextCrush(rows: ScheduleRow[]): void {
   container.innerHTML = `
     <div class="next-crush-number" style="font-size: 48px; margin-bottom: 4px;">${headline}</div>
     <div class="next-crush-sub">${sub}</div>
-    ${days > 0 ? `<div id="countdown-display" style="margin-top: 14px; font-family: 'Courier New', monospace; font-size: 24px; font-weight: bold; background: rgba(0,0,0,0.15); padding: 8px 16px; border-radius: 6px; letter-spacing: 1px; display: inline-block;"></div>` : ''}
+    <div id="countdown-display" style="margin-top: 14px; font-family: 'Courier New', monospace; font-size: 24px; font-weight: bold; background: rgba(0,0,0,0.15); padding: 8px 16px; border-radius: 6px; letter-spacing: 1px; display: inline-block;"></div>
   `;
 
-  if (days > 0) {
-    // Parse "YYYY-MM-DD" safely as local time midnight
-    const [y, m, d] = next.crush_date.split('-').map(Number);
-    const targetMs = new Date(y, m - 1, d).getTime();
-    
-    const updateCountdown = () => {
-      const now = new Date().getTime();
-      const diff = targetMs - now;
-      
-      const display = document.getElementById('countdown-display');
-      if (!display) return;
-      
-      if (diff <= 0) {
-        display.innerText = "0d 00h 00m 00s";
-        if (countdownTimer) clearInterval(countdownTimer);
-        return;
-      }
-      
-      const dd = Math.floor(diff / (1000 * 60 * 60 * 24));
-      const hh = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-      const mm = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-      const ss = Math.floor((diff % (1000 * 60)) / 1000);
-      
-      display.innerText = `${dd}d ${String(hh).padStart(2, '0')}h ${String(mm).padStart(2, '0')}m ${String(ss).padStart(2, '0')}s`;
-    };
-    
-    updateCountdown();
-    countdownTimer = setInterval(updateCountdown, 1000);
+  // Parse "YYYY-MM-DD" safely in local time
+  const [y, m, d] = next.crush_date.split('-').map(Number);
+  
+  // If days > 0 (future), count down until the day begins (midnight of crush date).
+  // If days === 0 (today), count down until the day ends (23:59:59 of today)
+  let targetMs = new Date(y, m - 1, d, 0, 0, 0).getTime();
+  if (days === 0) {
+    targetMs = new Date(y, m - 1, d, 23, 59, 59, 999).getTime();
   }
+  
+  const updateCountdown = () => {
+    const now = new Date().getTime();
+    const diff = targetMs - now;
+    
+    const display = document.getElementById('countdown-display');
+    if (!display) return;
+    
+    if (diff <= 0) {
+      display.innerText = "00h 00m 00s";
+      if (countdownTimer) clearInterval(countdownTimer);
+      return;
+    }
+    
+    const dd = Math.floor(diff / (1000 * 60 * 60 * 24));
+    const hh = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    const mm = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    const ss = Math.floor((diff % (1000 * 60)) / 1000);
+    
+    if (dd > 0) {
+      display.innerText = `${dd}d ${String(hh).padStart(2, '0')}h ${String(mm).padStart(2, '0')}m ${String(ss).padStart(2, '0')}s`;
+    } else {
+      display.innerText = `${String(hh).padStart(2, '0')}h ${String(mm).padStart(2, '0')}m ${String(ss).padStart(2, '0')}s`;
+    }
+  };
+  
+  updateCountdown();
+  countdownTimer = setInterval(updateCountdown, 1000);
 }
 
 /** Formats an ISO date as "Saturday, 21st March, 2026" */
