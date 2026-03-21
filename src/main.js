@@ -1,0 +1,561 @@
+import { calcCrushDate, parseDisplayDate } from './calc';
+import { save, load, migrateFromLocalStorage } from './storage';
+import { parseCSV, generateCSV, generateTemplate } from './csv';
+import { generatePDF } from './pdf';
+import { renderTable, renderFormRow, showBanner, setExportButtonsDisabled, renderNextCrush } from './ui';
+import { isFirebaseConfigured, loginWithGoogle, logout, onAuthChange, saveToCloud, loadFromCloud, getSharedSchedule } from './firebase';
+let state = [];
+let currentUserUid = null;
+let isSharedView = false;
+function getContainer() {
+    const el = document.getElementById('schedule-container');
+    if (!el)
+        throw new Error('Missing #schedule-container');
+    return el;
+}
+function afterMutation() {
+    save(state);
+    if (currentUserUid && !isSharedView) {
+        saveToCloud(currentUserUid, state).catch(e => console.error("Cloud save failed", e));
+    }
+    const cbGroup = document.getElementById('cb-group-by-name');
+    renderTable(state, getContainer(), cbGroup?.checked ?? false);
+    renderNextCrush(state);
+    setExportButtonsDisabled(state.length === 0);
+    const btn = document.getElementById('btn-batch-delete');
+    if (btn)
+        btn.style.display = 'none';
+    const selectAll = document.getElementById('batch-delete-all');
+    if (selectAll)
+        selectAll.checked = false;
+}
+function generateId() {
+    return typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : Date.now().toString() + Math.random().toString(36).slice(2);
+}
+function triggerDownload(content, filename, mimeType) {
+    const blob = new Blob([content], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+function getFormRowsContainer() {
+    const el = document.getElementById('form-rows');
+    if (!el)
+        throw new Error('Missing #form-rows');
+    return el;
+}
+function appendFormRow() {
+    const container = getFormRowsContainer();
+    const index = container.querySelectorAll('.form-row').length;
+    const row = renderFormRow(index);
+    container.appendChild(row);
+    wireRemoveButton(row);
+    wireSelectAll(row);
+}
+function reindexFormRows() {
+    const container = getFormRowsContainer();
+    const rows = container.querySelectorAll('.form-row');
+    rows.forEach((row, i) => {
+        row.dataset.index = String(i);
+        const removeBtn = row.querySelector('.btn-remove-row');
+        if (removeBtn) {
+            removeBtn.style.display = i === 0 ? 'none' : '';
+        }
+    });
+}
+function parseFormRows() {
+    const container = getFormRowsContainer();
+    const rows = container.querySelectorAll('.form-row');
+    const results = [];
+    for (const row of rows) {
+        const labelInput = row.querySelector('.input-label');
+        const dateInput = row.querySelector('.input-casting-date');
+        const checkboxes = row.querySelectorAll('.duration-checkbox:checked');
+        const label = labelInput?.value.trim() ?? '';
+        const dateRaw = dateInput?.value.trim() ?? '';
+        if (!label) {
+            showBanner('Sample label is required for every row.', 'error');
+            return null;
+        }
+        const castingDateISO = parseDisplayDate(dateRaw);
+        if (!castingDateISO) {
+            showBanner('Invalid casting date "' + dateRaw + '" - please use DD/MM/YYYY format.', 'error');
+            return null;
+        }
+        const offsetInput = row.querySelector('.input-offset');
+        let offset = parseInt(offsetInput?.value ?? '0', 10);
+        if (isNaN(offset))
+            offset = 0;
+        const durations = [];
+        checkboxes.forEach((cb) => {
+            const val = parseInt(cb.value, 10);
+            if (!isNaN(val))
+                durations.push(val);
+        });
+        if (durations.length === 0) {
+            showBanner('Please select at least one curing duration for each row.', 'error');
+            return null;
+        }
+        results.push({ label, castingDateISO, offset, durations });
+    }
+    return results;
+}
+function handleFormSubmit(e) {
+    e.preventDefault();
+    if (isSharedView) {
+        showBanner("You cannot add to a shared read-only schedule.", "warning", true);
+        return;
+    }
+    const parsed = parseFormRows();
+    if (!parsed)
+        return;
+    const newRows = [];
+    for (const { label, castingDateISO, offset, durations } of parsed) {
+        for (const duration of durations) {
+            newRows.push({
+                id: generateId(),
+                sample_label: label,
+                casting_date: castingDateISO,
+                curing_duration: duration,
+                curing_offset: offset,
+                crush_date: calcCrushDate(castingDateISO, duration, offset),
+            });
+        }
+    }
+    state.push(...newRows);
+    afterMutation();
+    const container = getFormRowsContainer();
+    container.innerHTML = '';
+    const firstRow = renderFormRow(0);
+    container.appendChild(firstRow);
+    wireRemoveButton(firstRow);
+    wireSelectAll(firstRow);
+    const addModal = document.getElementById('add-samples-modal');
+    if (addModal)
+        addModal.style.display = 'none';
+}
+function handleEdit(id) {
+    const rowIndex = state.findIndex(r => r.id === id);
+    if (rowIndex === -1)
+        return;
+    const row = state[rowIndex];
+    const tr = document.querySelector('tr[data-id="' + id + '"]');
+    if (!tr)
+        return;
+    const editTd = document.createElement('td');
+    editTd.colSpan = 9;
+    editTd.className = 'inline-edit';
+    const castingDisplay = formatForEdit(row.casting_date);
+    editTd.innerHTML = [
+        '<label>Label: <input type="text" class="edit-label" value="' + escapeAttr(row.sample_label) + '" /></label>',
+        '<label>Casting Date: <input type="text" class="edit-casting-date" value="' + castingDisplay + '" placeholder="DD/MM/YYYY" /></label>',
+        '<label>Offset (days): <input type="number" class="edit-offset" value="' + row.curing_offset + '" min="0" /></label>',
+        '<label>Curing Duration (days): <input type="number" class="edit-curing-duration" value="' + row.curing_duration + '" min="1" /></label>',
+        '<button type="button" class="btn-confirm-edit">Confirm</button>',
+        '<button type="button" class="btn-cancel-edit">Cancel</button>',
+    ].join('');
+    const originalCells = Array.from(tr.children);
+    while (tr.firstChild)
+        tr.removeChild(tr.firstChild);
+    tr.appendChild(editTd);
+    const confirmBtn = editTd.querySelector('.btn-confirm-edit');
+    const cancelBtn = editTd.querySelector('.btn-cancel-edit');
+    cancelBtn.addEventListener('click', () => {
+        while (tr.firstChild)
+            tr.removeChild(tr.firstChild);
+        originalCells.forEach(cell => tr.appendChild(cell));
+    });
+    confirmBtn.addEventListener('click', () => {
+        const newLabel = editTd.querySelector('.edit-label').value.trim();
+        const newDateRaw = editTd.querySelector('.edit-casting-date').value.trim();
+        const newDurationRaw = editTd.querySelector('.edit-curing-duration').value.trim();
+        const newOffsetRaw = editTd.querySelector('.edit-offset').value.trim();
+        if (!newLabel) {
+            showBanner('Sample label cannot be empty.', 'error');
+            return;
+        }
+        const newCastingISO = parseDisplayDate(newDateRaw);
+        if (!newCastingISO) {
+            showBanner('Invalid casting date "' + newDateRaw + '" - please use DD/MM/YYYY format.', 'error');
+            return;
+        }
+        const newDuration = Number(newDurationRaw);
+        if (!Number.isInteger(newDuration) || newDuration < 1) {
+            showBanner('Curing duration must be a positive integer.', 'error');
+            return;
+        }
+        const newOffset = Number(newOffsetRaw) || 0;
+        state[rowIndex] = {
+            ...row,
+            sample_label: newLabel,
+            casting_date: newCastingISO,
+            curing_duration: newDuration,
+            curing_offset: newOffset,
+            crush_date: calcCrushDate(newCastingISO, newDuration, newOffset),
+        };
+        afterMutation();
+    });
+}
+function handleDelete(id) {
+    if (isSharedView)
+        return;
+    if (!confirm('Are you sure you want to delete this row?'))
+        return;
+    state = state.filter(r => r.id !== id);
+    afterMutation();
+}
+function wireTableActions(container) {
+    container.addEventListener('click', (e) => {
+        if (isSharedView) {
+            const target = e.target;
+            if (target.classList.contains('btn-edit') || target.classList.contains('btn-delete') || target.classList.contains('batch-delete-cb') || target.id === 'batch-delete-all') {
+                showBanner("You cannot modify a shared read-only schedule.", "warning", true);
+                e.preventDefault();
+                return;
+            }
+        }
+        const target = e.target;
+        const id = target.dataset.id;
+        if (!id)
+            return;
+        if (target.classList.contains('btn-edit')) {
+            handleEdit(id);
+        }
+        else if (target.classList.contains('btn-delete')) {
+            handleDelete(id);
+        }
+    });
+}
+function handleCSVImport(file) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        const text = e.target?.result;
+        const result = parseCSV(text);
+        state.push(...result.added);
+        afterMutation();
+        const addedCount = result.added.length;
+        const skippedCount = result.skipped.length;
+        let message = 'Import complete: ' + addedCount + ' row(s) added';
+        if (skippedCount > 0) {
+            message += ', ' + skippedCount + ' row(s) skipped';
+            const details = result.skipped.map(s => 'Row ' + s.row + ': ' + s.reason).join('; ');
+            message += '. Details: ' + details;
+        }
+        showBanner(message, skippedCount > 0 ? 'warning' : 'info', skippedCount === 0);
+    };
+    reader.readAsText(file);
+}
+function escapeAttr(str) {
+    return str
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+}
+function formatForEdit(isoDate) {
+    const [yyyy, mm, dd] = isoDate.split('-');
+    return dd + '/' + mm + '/' + yyyy;
+}
+function wireSelectAll(row) {
+    const selectAll = row.querySelector('.duration-select-all');
+    const checkboxes = row.querySelectorAll('.duration-checkbox');
+    if (!selectAll)
+        return;
+    selectAll.addEventListener('change', () => {
+        checkboxes.forEach(cb => { cb.checked = selectAll.checked; });
+    });
+    checkboxes.forEach(cb => {
+        cb.addEventListener('change', () => {
+            const all = Array.from(checkboxes);
+            selectAll.checked = all.every(c => c.checked);
+            selectAll.indeterminate = !selectAll.checked && all.some(c => c.checked);
+        });
+    });
+}
+function wireRemoveButton(row) {
+    const removeBtn = row.querySelector('.btn-remove-row');
+    if (removeBtn) {
+        removeBtn.addEventListener('click', () => {
+            row.remove();
+            reindexFormRows();
+        });
+    }
+}
+async function init() {
+    await migrateFromLocalStorage();
+    const params = new URLSearchParams(window.location.search);
+    const shareId = params.get('share');
+    if (shareId) {
+        isSharedView = true;
+        try {
+            state = await getSharedSchedule(shareId);
+            showBanner("Viewing shared read-only schedule.", "info");
+            const btnOpenAdd = document.getElementById('btn-open-add-modal');
+            if (btnOpenAdd)
+                btnOpenAdd.style.display = 'none';
+            const btnOpenImport = document.getElementById('btn-open-import-modal');
+            if (btnOpenImport)
+                btnOpenImport.style.display = 'none';
+        }
+        catch {
+            showBanner("Shared schedule not found or access denied.", "error");
+            state = await load();
+            isSharedView = false;
+        }
+    }
+    else {
+        state = await load();
+    }
+    const cbGroup = document.getElementById('cb-group-by-name');
+    const container = getContainer();
+    renderTable(state, container, cbGroup?.checked ?? false);
+    renderNextCrush(state);
+    setExportButtonsDisabled(state.length === 0);
+    wireTableActions(container);
+    const batchDeleteBtn = document.getElementById('btn-batch-delete');
+    batchDeleteBtn?.addEventListener('click', () => {
+        const checkedBoxes = Array.from(container.querySelectorAll('.batch-delete-cb:checked'));
+        if (checkedBoxes.length === 0)
+            return;
+        if (!confirm('Are you sure you want to delete ' + checkedBoxes.length + ' rows?'))
+            return;
+        const idsToDelete = new Set(checkedBoxes.map(cb => cb.value));
+        state = state.filter(r => !idsToDelete.has(r.id));
+        afterMutation();
+    });
+    container.addEventListener('change', (e) => {
+        const target = e.target;
+        if (target.id === 'batch-delete-all') {
+            const cbs = container.querySelectorAll('.batch-delete-cb');
+            cbs.forEach(cb => { cb.checked = target.checked; });
+        }
+        else if (target.classList.contains('batch-delete-cb')) {
+            const selectAll = container.querySelector('#batch-delete-all');
+            if (selectAll) {
+                const cbs = Array.from(container.querySelectorAll('.batch-delete-cb'));
+                selectAll.checked = cbs.length > 0 && cbs.every(cb => cb.checked);
+                selectAll.indeterminate = !selectAll.checked && cbs.some(cb => cb.checked);
+            }
+        }
+        else if (target.classList.contains('cb-crushed')) {
+            const id = target.dataset.id;
+            if (!id)
+                return;
+            if (isSharedView) {
+                target.checked = !target.checked;
+                showBanner("You cannot modify a shared read-only schedule.", "warning", true);
+                return;
+            }
+            const rowIndex = state.findIndex(r => r.id === id);
+            if (rowIndex !== -1) {
+                state[rowIndex].is_crushed = target.checked;
+                afterMutation();
+            }
+        }
+        const anyChecked = container.querySelectorAll('.batch-delete-cb:checked').length > 0;
+        if (batchDeleteBtn) {
+            batchDeleteBtn.style.display = anyChecked ? '' : 'none';
+        }
+    });
+    const addRowBtn = document.getElementById('btn-add-row');
+    addRowBtn?.addEventListener('click', appendFormRow);
+    const addModal = document.getElementById('add-samples-modal');
+    const openModalBtn = document.getElementById('btn-open-add-modal');
+    const closeModalBtn = document.getElementById('btn-close-modal');
+    openModalBtn?.addEventListener('click', () => {
+        if (addModal)
+            addModal.style.display = 'flex';
+    });
+    closeModalBtn?.addEventListener('click', () => {
+        if (addModal)
+            addModal.style.display = 'none';
+    });
+    addModal?.addEventListener('click', (e) => {
+        if (e.target === addModal)
+            addModal.style.display = 'none';
+    });
+    cbGroup?.addEventListener('change', () => {
+        renderTable(state, getContainer(), cbGroup.checked);
+        const btn = document.getElementById('btn-batch-delete');
+        if (btn)
+            btn.style.display = 'none';
+        const selectAll = document.getElementById('batch-delete-all');
+        if (selectAll)
+            selectAll.checked = false;
+    });
+    const formRowsContainer = getFormRowsContainer();
+    const initialRow = formRowsContainer.querySelector('.form-row');
+    if (initialRow)
+        wireRemoveButton(initialRow);
+    if (initialRow)
+        wireSelectAll(initialRow);
+    const form = document.getElementById('sample-form');
+    form?.addEventListener('submit', handleFormSubmit);
+    const exportCsvBtn = document.getElementById('btn-export-csv');
+    exportCsvBtn?.addEventListener('click', () => {
+        const csv = generateCSV(state);
+        triggerDownload(csv, 'setpoint-schedule.csv', 'text/csv');
+    });
+    const exportPdfBtn = document.getElementById('btn-export-pdf');
+    exportPdfBtn?.addEventListener('click', () => {
+        const error = generatePDF(state);
+        if (error) {
+            showBanner('PDF export failed: ' + error, 'error');
+        }
+    });
+    const importModal = document.getElementById('import-export-modal');
+    const openImportBtn = document.getElementById('btn-open-import-modal');
+    const closeImportBtn = document.getElementById('btn-close-import-modal');
+    openImportBtn?.addEventListener('click', () => {
+        if (importModal)
+            importModal.style.display = 'flex';
+    });
+    closeImportBtn?.addEventListener('click', () => {
+        if (importModal)
+            importModal.style.display = 'none';
+    });
+    importModal?.addEventListener('click', (e) => {
+        if (e.target === importModal)
+            importModal.style.display = 'none';
+    });
+    const exportJsonBtn = document.getElementById('btn-export-json');
+    exportJsonBtn?.addEventListener('click', (e) => {
+        e.preventDefault();
+        const jsonStr = JSON.stringify(state, null, 2);
+        triggerDownload(jsonStr, 'setpoint-backup.json', 'application/json');
+        if (importModal)
+            importModal.style.display = 'none';
+    });
+    const jsonFileInput = document.getElementById('json-file-input');
+    jsonFileInput?.addEventListener('change', () => {
+        const f = jsonFileInput.files?.[0];
+        if (f) {
+            if (isSharedView) {
+                showBanner("Cannot import on a shared read-only view.", "error");
+                jsonFileInput.value = '';
+                if (importModal)
+                    importModal.style.display = 'none';
+                return;
+            }
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const content = e.target?.result;
+                    const parsed = JSON.parse(content);
+                    if (Array.isArray(parsed)) {
+                        const newIds = new Set(parsed.map((r) => r.id));
+                        state = state.filter(r => !newIds.has(r.id)).concat(parsed);
+                        afterMutation();
+                        showBanner(`Successfully restored ${parsed.length} rows from JSON backup.`, 'info', true);
+                    }
+                    else {
+                        showBanner('Invalid JSON format.', 'error', false);
+                    }
+                }
+                catch {
+                    showBanner('Failed to parse JSON backup file.', 'error', false);
+                }
+            };
+            reader.readAsText(f);
+            jsonFileInput.value = '';
+            if (importModal)
+                importModal.style.display = 'none';
+        }
+    });
+    const csvFileInput = document.getElementById('csv-file-input');
+    csvFileInput?.addEventListener('change', () => {
+        const f = csvFileInput.files?.[0];
+        if (f) {
+            handleCSVImport(f);
+            csvFileInput.value = '';
+            if (importModal)
+                importModal.style.display = 'none';
+        }
+    });
+    const templateLink = document.getElementById('btn-download-template');
+    templateLink?.addEventListener('click', (e) => {
+        e.preventDefault();
+        const template = generateTemplate();
+        triggerDownload(template, 'setpoint-template.csv', 'text/csv');
+    });
+    // Auth & Sharing Configuration
+    const btnLogin = document.getElementById('btn-login');
+    const btnLogout = document.getElementById('btn-logout');
+    const btnShare = document.getElementById('btn-share');
+    const userInfo = document.getElementById('user-info');
+    if (!isFirebaseConfigured) {
+        btnLogin?.addEventListener('click', () => {
+            alert('Firebase is not configured! Developers: configure VITE_FIREBASE_* variables in .env file to enable cloud sync and sharing.');
+        });
+    }
+    else {
+        btnLogin?.addEventListener('click', async () => {
+            try {
+                await loginWithGoogle();
+            }
+            catch (err) {
+                showBanner(err.message || 'Login failed', 'error');
+            }
+        });
+        btnLogout?.addEventListener('click', async () => {
+            await logout();
+        });
+        onAuthChange(async (user) => {
+            if (user) {
+                currentUserUid = user.uid;
+                if (btnLogin)
+                    btnLogin.style.display = 'none';
+                if (btnLogout)
+                    btnLogout.style.display = '';
+                if (btnShare)
+                    btnShare.style.display = '';
+                if (userInfo) {
+                    userInfo.style.display = '';
+                    userInfo.textContent = user.email || 'Logged in';
+                }
+                if (!isSharedView) {
+                    const cloudData = await loadFromCloud(user.uid);
+                    if (cloudData.length > 0) {
+                        state = cloudData;
+                        afterMutation();
+                    }
+                    else if (state.length > 0) {
+                        await saveToCloud(user.uid, state);
+                    }
+                }
+            }
+            else {
+                currentUserUid = null;
+                if (btnLogin)
+                    btnLogin.style.display = '';
+                if (btnLogout)
+                    btnLogout.style.display = 'none';
+                if (btnShare)
+                    btnShare.style.display = 'none';
+                if (userInfo) {
+                    userInfo.style.display = 'none';
+                    userInfo.textContent = '';
+                }
+            }
+        });
+        btnShare?.addEventListener('click', () => {
+            if (!currentUserUid || !isFirebaseConfigured) {
+                alert('Must be logged in to share.');
+                return;
+            }
+            const url = new URL(window.location.href);
+            url.searchParams.set('share', currentUserUid);
+            navigator.clipboard.writeText(url.toString());
+            showBanner('Read-only share link copied to clipboard!', 'info', true);
+        });
+    }
+}
+document.addEventListener('DOMContentLoaded', init);

@@ -4,8 +4,11 @@ import { save, load, migrateFromLocalStorage } from './storage';
 import { parseCSV, generateCSV, generateTemplate } from './csv';
 import { generatePDF } from './pdf';
 import { renderTable, renderFormRow, showBanner, setExportButtonsDisabled, renderNextCrush } from './ui';
+import { isFirebaseConfigured, loginWithGoogle, logout, onAuthChange, saveToCloud, loadFromCloud, getSharedSchedule } from './firebase';
 
 let state: ScheduleRow[] = [];
+let currentUserUid: string | null = null;
+let isSharedView = false;
 
 function getContainer(): HTMLElement {
   const el = document.getElementById('schedule-container');
@@ -15,6 +18,9 @@ function getContainer(): HTMLElement {
 
 function afterMutation(): void {
   save(state);
+  if (currentUserUid && !isSharedView) {
+    saveToCloud(currentUserUid, state).catch(e => console.error("Cloud save failed", e));
+  }
   const cbGroup = document.getElementById('cb-group-by-name') as HTMLInputElement | null;
   renderTable(state, getContainer(), cbGroup?.checked ?? false);
   renderNextCrush(state);
@@ -124,6 +130,10 @@ function parseFormRows(): ParsedFormRow[] | null {
 
 function handleFormSubmit(e: Event): void {
   e.preventDefault();
+  if (isSharedView) {
+    showBanner("You cannot add to a shared read-only schedule.", "warning", true);
+    return;
+  }
 
   const parsed = parseFormRows();
   if (!parsed) return;
@@ -229,6 +239,7 @@ function handleEdit(id: string): void {
 }
 
 function handleDelete(id: string): void {
+  if (isSharedView) return;
   if (!confirm('Are you sure you want to delete this row?')) return;
   state = state.filter(r => r.id !== id);
   afterMutation();
@@ -236,6 +247,15 @@ function handleDelete(id: string): void {
 
 function wireTableActions(container: HTMLElement): void {
   container.addEventListener('click', (e: Event) => {
+    if (isSharedView) {
+      const target = e.target as HTMLElement;
+      if (target.classList.contains('btn-edit') || target.classList.contains('btn-delete') || target.classList.contains('batch-delete-cb') || target.id === 'batch-delete-all') {
+        showBanner("You cannot modify a shared read-only schedule.", "warning", true);
+        e.preventDefault();
+        return;
+      }
+    }
+
     const target = e.target as HTMLElement;
     const id = target.dataset.id;
     if (!id) return;
@@ -314,7 +334,26 @@ function wireRemoveButton(row: HTMLElement): void {
 
 async function init(): Promise<void> {
   await migrateFromLocalStorage();
-  state = await load();
+
+  const params = new URLSearchParams(window.location.search);
+  const shareId = params.get('share');
+  if (shareId) {
+    isSharedView = true;
+    try {
+      state = await getSharedSchedule(shareId);
+      showBanner("Viewing shared read-only schedule.", "info");
+      const btnOpenAdd = document.getElementById('btn-open-add-modal');
+      if (btnOpenAdd) btnOpenAdd.style.display = 'none';
+      const btnOpenImport = document.getElementById('btn-open-import-modal');
+      if (btnOpenImport) btnOpenImport.style.display = 'none';
+    } catch {
+      showBanner("Shared schedule not found or access denied.", "error");
+      state = await load();
+      isSharedView = false;
+    }
+  } else {
+    state = await load();
+  }
 
   const cbGroup = document.getElementById('cb-group-by-name') as HTMLInputElement | null;
   const container = getContainer();
@@ -346,6 +385,19 @@ async function init(): Promise<void> {
         const cbs = Array.from(container.querySelectorAll<HTMLInputElement>('.batch-delete-cb'));
         selectAll.checked = cbs.length > 0 && cbs.every(cb => cb.checked);
         selectAll.indeterminate = !selectAll.checked && cbs.some(cb => cb.checked);
+      }
+    } else if (target.classList.contains('cb-crushed')) {
+      const id = target.dataset.id;
+      if (!id) return;
+      if (isSharedView) {
+        target.checked = !target.checked;
+        showBanner("You cannot modify a shared read-only schedule.", "warning", true);
+        return;
+      }
+      const rowIndex = state.findIndex(r => r.id === id);
+      if (rowIndex !== -1) {
+        state[rowIndex].is_crushed = target.checked;
+        afterMutation();
       }
     }
     
@@ -402,12 +454,68 @@ async function init(): Promise<void> {
     }
   });
 
+  const importModal = document.getElementById('import-export-modal');
+  const openImportBtn = document.getElementById('btn-open-import-modal');
+  const closeImportBtn = document.getElementById('btn-close-import-modal');
+
+  openImportBtn?.addEventListener('click', () => {
+    if (importModal) importModal.style.display = 'flex';
+  });
+  closeImportBtn?.addEventListener('click', () => {
+    if (importModal) importModal.style.display = 'none';
+  });
+  importModal?.addEventListener('click', (e) => {
+    if (e.target === importModal) importModal.style.display = 'none';
+  });
+
+  const exportJsonBtn = document.getElementById('btn-export-json');
+  exportJsonBtn?.addEventListener('click', (e) => {
+    e.preventDefault();
+    const jsonStr = JSON.stringify(state, null, 2);
+    triggerDownload(jsonStr, 'setpoint-backup.json', 'application/json');
+    if (importModal) importModal.style.display = 'none';
+  });
+
+  const jsonFileInput = document.getElementById('json-file-input') as HTMLInputElement | null;
+  jsonFileInput?.addEventListener('change', () => {
+    const f = jsonFileInput.files?.[0];
+    if (f) {
+      if (isSharedView) {
+        showBanner("Cannot import on a shared read-only view.", "error");
+        jsonFileInput.value = '';
+        if (importModal) importModal.style.display = 'none';
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const content = e.target?.result as string;
+          const parsed = JSON.parse(content);
+          if (Array.isArray(parsed)) {
+            const newIds = new Set(parsed.map((r: any) => r.id));
+            state = state.filter(r => !newIds.has(r.id)).concat(parsed);
+            afterMutation();
+            showBanner(`Successfully restored ${parsed.length} rows from JSON backup.`, 'info', true);
+          } else {
+            showBanner('Invalid JSON format.', 'error', false);
+          }
+        } catch {
+          showBanner('Failed to parse JSON backup file.', 'error', false);
+        }
+      };
+      reader.readAsText(f);
+      jsonFileInput.value = '';
+      if (importModal) importModal.style.display = 'none';
+    }
+  });
+
   const csvFileInput = document.getElementById('csv-file-input') as HTMLInputElement | null;
   csvFileInput?.addEventListener('change', () => {
     const f = csvFileInput.files?.[0];
     if (f) {
       handleCSVImport(f);
       csvFileInput.value = '';
+      if (importModal) importModal.style.display = 'none';
     }
   });
 
@@ -417,6 +525,73 @@ async function init(): Promise<void> {
     const template = generateTemplate();
     triggerDownload(template, 'setpoint-template.csv', 'text/csv');
   });
+
+  // Auth & Sharing Configuration
+  const btnLogin = document.getElementById('btn-login');
+  const btnLogout = document.getElementById('btn-logout');
+  const btnShare = document.getElementById('btn-share');
+  const userInfo = document.getElementById('user-info');
+
+  if (!isFirebaseConfigured) {
+    btnLogin?.addEventListener('click', () => {
+      alert('Firebase is not configured! Developers: configure VITE_FIREBASE_* variables in .env file to enable cloud sync and sharing.');
+    });
+  } else {
+    btnLogin?.addEventListener('click', async () => {
+      try {
+        await loginWithGoogle();
+      } catch (err: any) {
+        showBanner(err.message || 'Login failed', 'error');
+      }
+    });
+
+    btnLogout?.addEventListener('click', async () => {
+      await logout();
+    });
+
+    onAuthChange(async (user) => {
+      if (user) {
+        currentUserUid = user.uid;
+        if (btnLogin) btnLogin.style.display = 'none';
+        if (btnLogout) btnLogout.style.display = '';
+        if (btnShare) btnShare.style.display = '';
+        if (userInfo) {
+          userInfo.style.display = '';
+          userInfo.textContent = user.email || 'Logged in';
+        }
+
+        if (!isSharedView) {
+          const cloudData = await loadFromCloud(user.uid);
+          if (cloudData.length > 0) {
+            state = cloudData;
+            afterMutation();
+          } else if (state.length > 0) {
+            await saveToCloud(user.uid, state);
+          }
+        }
+      } else {
+        currentUserUid = null;
+        if (btnLogin) btnLogin.style.display = '';
+        if (btnLogout) btnLogout.style.display = 'none';
+        if (btnShare) btnShare.style.display = 'none';
+        if (userInfo) {
+          userInfo.style.display = 'none';
+          userInfo.textContent = '';
+        }
+      }
+    });
+
+    btnShare?.addEventListener('click', () => {
+      if (!currentUserUid || !isFirebaseConfigured) {
+        alert('Must be logged in to share.');
+        return;
+      }
+      const url = new URL(window.location.href);
+      url.searchParams.set('share', currentUserUid);
+      navigator.clipboard.writeText(url.toString());
+      showBanner('Read-only share link copied to clipboard!', 'info', true);
+    });
+  }
 }
 
 document.addEventListener('DOMContentLoaded', init);

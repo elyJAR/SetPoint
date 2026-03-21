@@ -40,13 +40,15 @@ export function renderTable(rows: ScheduleRow[], container: HTMLElement, groupBy
   const tbody = document.createElement('tbody');
 
   function createRow(row: ScheduleRow, rowIndex: number) {
-    const status = getRowStatus(row.crush_date);
+    let status = getRowStatus(row.crush_date) as string;
+    if (row.is_crushed) status = 'crushed';
+
     const days = daysUntilCrush(row.crush_date);
-    const daysLabel = days < 0
+    const daysLabel = row.is_crushed ? 'Done' : (days < 0
       ? `${Math.abs(days)}d overdue`
       : days === 0
         ? 'Today'
-        : `${days}d`;
+        : `${days}d`);
 
     const tr = document.createElement('tr');
     tr.className = `row--${status}`;
@@ -62,6 +64,9 @@ export function renderTable(rows: ScheduleRow[], container: HTMLElement, groupBy
       <td>${formatDisplayDate(row.crush_date)}</td>
       <td class="days-left days-left--${status}">${daysLabel}</td>
       <td>
+        <label style="display: inline-flex; align-items: center; gap: 4px; cursor: pointer; white-space: nowrap; margin-right: 8px;">
+          <input type="checkbox" class="cb-crushed" data-id="${escapeHtml(row.id)}" ${row.is_crushed ? 'checked' : ''} /> Done
+        </label>
         <button class="btn-edit" data-id="${escapeHtml(row.id)}">Edit</button>
         <button class="btn-delete" data-id="${escapeHtml(row.id)}">Delete</button>
       </td>
@@ -217,13 +222,20 @@ export function setExportButtonsDisabled(disabled: boolean): void {
  * Shows the soonest upcoming (or today's) crush date and a big day number.
  * Hides the section when there are no future/today rows.
  */
+let countdownTimer: ReturnType<typeof setInterval> | null = null;
+
 export function renderNextCrush(rows: ScheduleRow[]): void {
   const section = document.getElementById('next-crush-section');
   const container = document.getElementById('next-crush-container');
   if (!section || !container) return;
 
+  if (countdownTimer) {
+    clearInterval(countdownTimer);
+    countdownTimer = null;
+  }
+
   const upcoming = rows
-    .filter(r => daysUntilCrush(r.crush_date) >= 0)
+    .filter(r => !r.is_crushed && daysUntilCrush(r.crush_date) >= 0)
     .sort((a, b) => a.crush_date < b.crush_date ? -1 : 1);
 
   if (upcoming.length === 0) {
@@ -239,16 +251,46 @@ export function renderNextCrush(rows: ScheduleRow[]): void {
   const sameDay = upcoming.filter(r => r.crush_date === next.crush_date);
   const labels = sameDay.map(r => escapeHtml(r.sample_label)).join(', ');
 
-  const dayWord = days === 1 ? 'day' : 'days';
-  const headline = days === 0 ? 'Today' : `${days} ${dayWord}`;
+  const headline = days === 0 ? 'Today' : 'Upcoming';
   const sub = days === 0
     ? `Crush today — ${labels}`
-    : `Next crush on ${formatLongDate(next.crush_date)} — ${labels}`;
+    : `On ${formatLongDate(next.crush_date)} — ${labels}`;
 
   container.innerHTML = `
-    <div class="next-crush-number">${headline}</div>
+    <div class="next-crush-number" style="font-size: 48px; margin-bottom: 4px;">${headline}</div>
     <div class="next-crush-sub">${sub}</div>
+    ${days > 0 ? `<div id="countdown-display" style="margin-top: 14px; font-family: 'Courier New', monospace; font-size: 24px; font-weight: bold; background: rgba(0,0,0,0.15); padding: 8px 16px; border-radius: 6px; letter-spacing: 1px; display: inline-block;"></div>` : ''}
   `;
+
+  if (days > 0) {
+    // Parse "YYYY-MM-DD" safely as local time midnight
+    const [y, m, d] = next.crush_date.split('-').map(Number);
+    const targetMs = new Date(y, m - 1, d).getTime();
+    
+    const updateCountdown = () => {
+      const now = new Date().getTime();
+      const diff = targetMs - now;
+      
+      const display = document.getElementById('countdown-display');
+      if (!display) return;
+      
+      if (diff <= 0) {
+        display.innerText = "0d 00h 00m 00s";
+        if (countdownTimer) clearInterval(countdownTimer);
+        return;
+      }
+      
+      const dd = Math.floor(diff / (1000 * 60 * 60 * 24));
+      const hh = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      const mm = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const ss = Math.floor((diff % (1000 * 60)) / 1000);
+      
+      display.innerText = `${dd}d ${String(hh).padStart(2, '0')}h ${String(mm).padStart(2, '0')}m ${String(ss).padStart(2, '0')}s`;
+    };
+    
+    updateCountdown();
+    countdownTimer = setInterval(updateCountdown, 1000);
+  }
 }
 
 /** Formats an ISO date as "Saturday, 21st March, 2026" */

@@ -224,7 +224,11 @@
     .link-btn:hover { color: #1d4ed8; border-bottom-color: #2563eb; }
 
     /* ── Banner ── */
-    #banner-container { margin-bottom: 16px; }
+    #banner-container { 
+      margin-bottom: 16px; 
+      position: relative;
+      z-index: 1050;
+    }
     .banner {
       display: flex;
       align-items: flex-start;
@@ -321,6 +325,13 @@
     .days-left--past   { color: #dc2626; }
 
     /* ── Row Status ── */
+    tr.row--crushed   { background: #f3f4f6; opacity: 0.6; }
+    tr.row--crushed td { text-decoration: line-through; }
+    tr.row--crushed td.days-left, 
+    tr.row--crushed td:first-child,
+    tr.row--crushed td:last-child { text-decoration: none; }
+    .days-left--crushed { color: #6b7280; }
+
     tr.row--past   { background: #fff5f5; }
     tr.row--past:hover { background: #fee2e2; }
     tr.row--today  { background: #f0fdf4; }
@@ -452,6 +463,12 @@
         gap: 12px;
       }
       .form-actions button { width: 100%; }
+      .header-actions .btn {
+        padding: 8px 10px;
+      }
+      .header-actions .btn-label {
+        display: none;
+      }
     }
     @media (max-width: 480px) {
       .card { padding: 16px; }
@@ -463,21 +480,35 @@
 <body>
   <div class="app-wrapper">
 
-    <!-- Header -->
     <header class="app-header">
-      <div>
-        <div class="app-title">Set<span>Point</span></div>
+      <div style="display: flex; flex-direction: column; gap: 6px;">
+        <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
+          <div class="app-title">Set<span>Point</span></div>
+          <div id="auth-section" style="display: flex; gap: 10px; align-items: center; border-left: 1px solid #d1d5db; padding-left: 16px;">
+            <span id="user-info" style="font-size: 13px; color: #4b5563; display: none;"></span>
+            <button id="btn-login" class="btn btn-primary btn-sm">Sign In</button>
+            <button id="btn-logout" class="btn btn-secondary btn-sm" style="display: none;">Sign Out</button>
+            <button id="btn-share" class="btn btn-secondary btn-sm" style="display: none;" title="Share this schedule">🔗 Share</button>
+          </div>
+        </div>
         <div class="app-subtitle">Concrete Curing Schedule Tracker</div>
       </div>
-      <div class="header-actions">
-        <button id="btn-open-add-modal" class="btn btn-primary">
-          + Add Samples
+      <div class="header-actions" style="flex-wrap: nowrap;">
+        <button id="btn-open-add-modal" class="btn btn-primary" title="Add Samples">
+          <svg style="width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"></path></svg>
+          <span class="btn-label">Add Samples</span>
         </button>
-        <button id="btn-export-csv" class="btn btn-secondary" disabled>
-          &#8595; Export CSV
+        <button id="btn-open-import-modal" class="btn btn-secondary" title="Import / Export Data">
+          <svg style="width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"></path></svg>
+          <span class="btn-label">Data</span>
         </button>
-        <button id="btn-export-pdf" class="btn btn-secondary" disabled>
-          &#8595; Export PDF
+        <button id="btn-export-csv" class="btn btn-secondary" disabled title="Export CSV">
+          <svg style="width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"></path><path d="M14 2v6h6M8 13h8M8 17h8M8 9h2"></path></svg>
+          <span class="btn-label">CSV</span>
+        </button>
+        <button id="btn-export-pdf" class="btn btn-secondary" disabled title="Export PDF">
+          <svg style="width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"></path><path d="M14 2v6h6M10 18v-4a2 2 0 114 0v4M10 18h4"></path></svg>
+          <span class="btn-label">PDF</span>
         </button>
       </div>
     </header>
@@ -548,15 +579,25 @@
     </section>
   </div>
 
-    <!-- Import Panel -->
-    <section class="card">
-      <div class="card-title">Import / Export</div>
-      <div class="import-row">
-        <label for="csv-file-input">Import CSV:</label>
-        <input type="file" id="csv-file-input" accept=".csv" />
-        <a href="#" id="btn-download-template" class="link-btn">Download Template</a>
-      </div>
-    </section>
+    <!-- Import Panel Modal -->
+    <div id="import-export-modal" class="modal-backdrop" style="display: none;">
+      <section class="card modal-content" style="max-width: 500px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+          <div class="card-title" style="margin-bottom: 0;">Import / Export Data</div>
+          <button type="button" id="btn-close-import-modal" class="btn-close" aria-label="Close">&times;</button>
+        </div>
+        <div class="import-row" style="margin-bottom: 12px; display: flex; align-items: center; gap: 14px;">
+          <label for="csv-file-input" style="width: 100px;">Import CSV:</label>
+          <input type="file" id="csv-file-input" accept=".csv" />
+          <a href="#" id="btn-download-template" class="link-btn">Download CSV Template</a>
+        </div>
+        <div class="import-row" style="display: flex; align-items: center; gap: 14px;">
+          <label for="json-file-input" style="width: 100px;">Restore JSON:</label>
+          <input type="file" id="json-file-input" accept=".json" />
+          <a href="#" id="btn-export-json" class="link-btn">Backup to JSON</a>
+        </div>
+      </section>
+    </div>
 
     <!-- Schedule Table -->
     <section class="card">
