@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 jobs:
   build:
@@ -40,6 +41,9 @@ jobs:
 
       - name: Sync Capacitor Android
         run: npx cap sync android
+
+      - name: Make Gradlew Executable
+        run: sudo apt-get update && sudo apt-get install -y dos2unix && dos2unix android/gradlew && chmod +x android/gradlew
 
       - name: Build APK
         working-directory: ./android

@@ -1,53 +1,69 @@
-# SetPoint Android Release Troubleshooting Guide
+# Android Build and GitHub Release Setup Guide
 
-Use this guide if the GitHub Actions build for the Android APK fails.
+This document outlines the configuration and steps required to automatically build the Android APK and publish it to GitHub Releases whenever changes are pushed to the `main` branch.
 
-## Common Issues and Fixes
+## 1. Overview
+The project uses **Capacitor** to wrap the web application into a native Android project. The automation is handled by **GitHub Actions**, which performs the following:
+1. Environment setup (Node.js & Java 21).
+2. Web build generation (`npm run build`).
+3. Synchronization with Capacitor (`npx cap sync android`).
+4. Native Android build via Gradle.
+5. Automated release management using the GitHub CLI (`gh`).
 
-### 1. `invalid source release: 21`
-**Cause:** The Android project requires JDK 21, but the GitHub runner is using an older version (e.g., JDK 17).
-**Fix:** Update `.github/workflows/android.yml`:
-```yaml
-- name: Set up JDK 21
-  uses: actions/setup-java@v4
-  with:
-    java-version: '21'
-    distribution: 'temurin'
-```
+## 2. GitHub Actions Configuration
+The primary workflow is defined in [`.github/workflows/android_build.yml`](.github/workflows/android_build.yml).
 
-### 2. `The Capacitor CLI requires NodeJS >=22.0.0`
-**Cause:** Capacitor v8+ requires Node.js 22 or higher.
-**Fix:** Update `.github/workflows/android.yml`:
-```yaml
-- name: Set up Node.js
-  uses: actions/setup-node@v4
-  with:
-    node-version: 22
-```
+### Key Execution Steps:
+#### A. Environment Setup
+- **Java 21 (Zulu Distribution):** Required for modern Android Gradle builds.
+- **Node.js 20:** Used for dependency installation and Vite build steps.
 
-### 3. `./gradlew: Permission denied` (Exit Code 126)
-**Cause:** The `gradlew` script in the `android/` folder lost its executable permission in the git repository.
-**Fix:** Run the following command from your local terminal and commit:
+#### B. Permission Handling (Windows-to-Linux Compatibility)
+One of the most common issues when building on Linux (GitHub's runners) from a project developed on Windows is the line-ending format (CRLF vs LF) of the `gradlew` script.
+- **Fix Applied:** We used `dos2unix` to convert `android/gradlew` to LF format and granted execution permissions using `chmod +x`.
+
+#### C. Build Strategy
+The workflow executes:
 ```bash
-git update-index --chmod=+x android/gradlew
-git commit -m "fix: restore gradlew execution permissions"
-git push origin main
+npx cap sync android
+cd android && ./gradlew assembleDebug
 ```
+This generates a debug APK located at `android/app/build/outputs/apk/debug/`.
 
-### 4. Deprecation Warnings (Node 20)
-**Cause:** GitHub is deprecating Node 20 runners.
-**Fix:** Add this environment variable to the top of your job in `.github/workflows/android.yml`:
-```yaml
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-```
+#### D. Automated GitHub Release
+Instead of keeping old builds, the workflow is configured to maintain a "Latest" release:
+1. Deletes the existing `latest` release.
+2. Deletes the `latest` tag.
+3. Creates a new release tagged `latest` and uploads the newly built APK.
 
-### 5. Logo / Icon Updates
-If you change the `setpoint_logo.svg` in the root:
-1. Copy it to `assets/logo.svg`.
-2. Run: `npx @capacitor/assets generate`.
-3. Commit the changes in the `android/app/src/main/res/` folder to update the app icon and splash screen.
+## 3. Mandatory Repository Settings
+For this automation to work successfully, the following settings were verified/applied:
 
-## Deployment Flow
-1. **Web:** `npm run build` then `firebase deploy`.
-2. **Android:** `git push origin main` triggers the GitHub Action to build and create a release.
+### A. Workflow Permissions
+GitHub Actions must have permission to create releases.
+1. Go to **Settings > Actions > General**.
+2. Under **Workflow permissions**, ensure **Read and write permissions** is selected.
+3. Alternatively, the workflow file explicitly defines these permissions:
+   ```yaml
+   permissions:
+     actions: write
+     contents: write
+   ```
+
+### B. Secrets
+While the workflow uses the built-in `${{ secrets.GITHUB_TOKEN }}`, no manual secrets are required for the standard build unless signing a production (release) APK is intended.
+
+## 4. Troubleshooting Build Failures
+- **Gradle Permissions:** If the build fails with `Permission denied` on `gradlew`, ensure the `chmod +x` step is correctly targeting the file.
+- **Java Version:** Ensure `java-version: '21'` is used; older versions (like 8 or 11) will fail with modern Gradle/Capacitor setups.
+- **Node Modules:** `npm install` must run before `npx cap sync` to ensure the Capacitor CLI and platform-specific dependencies are available.
+
+## 5. Moving to Production Releases
+The current setup generates a **Debug APK**. To generate a signed **Production (Release) APK**, you would:
+1. Generate a keystore file locally.
+2. Add the keystore as a secret in GitHub.
+3. Update the Gradle build step in `android_build.yml` to use `assembleRelease`.
+4. Configure signing in the `android/app/build.gradle` file using environment variables provided by GitHub Actions.
+
+---
+*Created on 2026-03-21 to document the CI/CD pipeline for the SetPoint project.*
