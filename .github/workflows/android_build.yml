@@ -51,13 +51,23 @@ jobs:
       - name: Make Gradlew Executable
         run: sudo apt-get update && sudo apt-get install -y dos2unix && dos2unix android/gradlew && chmod +x android/gradlew
 
-      - name: Generate SHA-1 Fingerprints
+      - name: Setup Debug Keystore
         run: |
           mkdir -p ~/.android
           mkdir -p ~/.config/.android
-          keytool -genkey -v -keystore ~/.android/debug.keystore -alias AndroidDebugKey -storepass android -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          if [ -n "${{ secrets.DEBUG_KEYSTORE_BASE64 }}" ]; then
+            echo "Restoring keystore from secret..."
+            echo "${{ secrets.DEBUG_KEYSTORE_BASE64 }}" | base64 --decode > ~/.android/debug.keystore
+          else
+            echo "Generating new keystore (first run)..."
+            keytool -genkey -v -keystore ~/.android/debug.keystore -alias AndroidDebugKey -storepass android -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+            echo "=== BASE64 KEYSTORE (save this as DEBUG_KEYSTORE_BASE64 secret) ==="
+            base64 -w 0 ~/.android/debug.keystore
+            echo ""
+            echo "=== SHA-1 FINGERPRINT (register this in Firebase Console) ==="
+            keytool -list -v -keystore ~/.android/debug.keystore -alias AndroidDebugKey -storepass android | grep "SHA1:"
+          fi
           cp ~/.android/debug.keystore ~/.config/.android/debug.keystore
-          cd android && ./gradlew signingReport
 
       - name: Build APK
         working-directory: ./android
