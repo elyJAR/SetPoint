@@ -6,6 +6,7 @@ import { generatePDF } from './pdf';
 import { renderTable, renderFormRow, showBanner, setExportButtonsDisabled, renderNextCrush, showInfoModal } from './ui';
 import { requestNotificationPermission, updateLocalNotifications } from './notifications';
 import { isFirebaseConfigured, loginWithGoogle, logout, onAuthChange, saveToCloud, loadFromCloud, getSharedSchedule } from './firebase';
+import { Capacitor } from '@capacitor/core';
 
 let state: ScheduleRow[] = [];
 let currentUserUid: string | null = null;
@@ -357,6 +358,11 @@ function wireRemoveButton(row: HTMLElement): void {
 async function init(): Promise<void> {
   await migrateFromLocalStorage();
   requestNotificationPermission();
+
+  if (import.meta.env.PROD && Capacitor.isNativePlatform()) {
+    const { GoogleAuth } = await import('@codetrix-studio/capacitor-google-auth');
+    GoogleAuth.initialize();
+  }
 
   const params = new URLSearchParams(window.location.search);
   const shareId = params.get('share');

@@ -51,6 +51,10 @@ jobs:
       - name: Make Gradlew Executable
         run: sudo apt-get update && sudo apt-get install -y dos2unix && dos2unix android/gradlew && chmod +x android/gradlew
 
+      - name: Generate SHA-1 Fingerprints
+        working-directory: ./android
+        run: ./gradlew signingReport
+
       - name: Build APK
         working-directory: ./android
         run: ./gradlew assembleDebug

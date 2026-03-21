@@ -1,7 +1,9 @@
 import { initializeApp } from 'firebase/app';
 import { 
-  getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged, User 
+  getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged, User, signInWithCredential 
 } from 'firebase/auth';
+import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth';
+import { Capacitor } from '@capacitor/core';
 import { 
   getFirestore, doc, setDoc, getDoc 
 } from 'firebase/firestore';
@@ -32,9 +34,19 @@ if (isFirebaseConfigured) {
 
 export async function loginWithGoogle(): Promise<User | null> {
   if (!auth) throw new Error("Firebase not configured. Please add config to .env");
-  const provider = new GoogleAuthProvider();
-  const res = await signInWithPopup(auth, provider);
-  return res.user;
+  
+  if (Capacitor.isNativePlatform()) {
+    // Native mobile flow: account picker
+    const user = await GoogleAuth.signIn();
+    const credential = GoogleAuthProvider.credential(user.authentication.idToken);
+    const res = await signInWithCredential(auth, credential);
+    return res.user;
+  } else {
+    // Web flow: popup
+    const provider = new GoogleAuthProvider();
+    const res = await signInWithPopup(auth, provider);
+    return res.user;
+  }
 }
 
 export async function logout(): Promise<void> {
