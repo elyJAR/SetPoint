@@ -4,6 +4,7 @@ import { save, load, migrateFromLocalStorage } from './storage';
 import { parseCSV, generateCSV, generateTemplate } from './csv';
 import { generatePDF } from './pdf';
 import { renderTable, renderFormRow, showBanner, setExportButtonsDisabled, renderNextCrush, showInfoModal } from './ui';
+import { requestNotificationPermission, updateLocalNotifications } from './notifications';
 import { isFirebaseConfigured, loginWithGoogle, logout, onAuthChange, saveToCloud, loadFromCloud, getSharedSchedule } from './firebase';
 
 let state: ScheduleRow[] = [];
@@ -29,6 +30,8 @@ function afterMutation(): void {
   if (btn) btn.style.display = 'none';
   const selectAll = document.getElementById('batch-delete-all') as HTMLInputElement | null;
   if (selectAll) selectAll.checked = false;
+
+  updateLocalNotifications(state);
 }
 
 function generateId(): string {
@@ -353,6 +356,7 @@ function wireRemoveButton(row: HTMLElement): void {
 
 async function init(): Promise<void> {
   await migrateFromLocalStorage();
+  requestNotificationPermission();
 
   const params = new URLSearchParams(window.location.search);
   const shareId = params.get('share');

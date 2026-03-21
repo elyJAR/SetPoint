@@ -8,10 +8,14 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@capacitor/android": "^8.2.0",
+    "@capacitor/core": "^8.2.0",
+    "@capacitor/local-notifications": "^8.0.2",
     "firebase": "^12.11.0",
     "jspdf": "^2.5.1"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.2.0",
     "@vitest/coverage-v8": "^1.6.0",
     "fast-check": "^3.19.0",
     "jsdom": "^24.0.0",

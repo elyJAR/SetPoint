@@ -3,6 +3,7 @@ import { save, load, migrateFromLocalStorage } from './storage';
 import { parseCSV, generateCSV, generateTemplate } from './csv';
 import { generatePDF } from './pdf';
 import { renderTable, renderFormRow, showBanner, setExportButtonsDisabled, renderNextCrush, showInfoModal } from './ui';
+import { requestNotificationPermission, updateLocalNotifications } from './notifications';
 import { isFirebaseConfigured, loginWithGoogle, logout, onAuthChange, saveToCloud, loadFromCloud, getSharedSchedule } from './firebase';
 let state = [];
 let currentUserUid = null;
@@ -28,6 +29,7 @@ function afterMutation() {
     const selectAll = document.getElementById('batch-delete-all');
     if (selectAll)
         selectAll.checked = false;
+    updateLocalNotifications(state);
 }
 function generateId() {
     return typeof crypto !== 'undefined' && crypto.randomUUID
@@ -307,6 +309,7 @@ function wireRemoveButton(row) {
 }
 async function init() {
     await migrateFromLocalStorage();
+    requestNotificationPermission();
     const params = new URLSearchParams(window.location.search);
     const shareId = params.get('share');
     if (shareId) {
