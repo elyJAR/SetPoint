@@ -2,7 +2,7 @@ import { calcCrushDate, parseDisplayDate } from './calc';
 import { save, load, migrateFromLocalStorage } from './storage';
 import { parseCSV, generateCSV, generateTemplate } from './csv';
 import { generatePDF } from './pdf';
-import { renderTable, renderFormRow, showBanner, setExportButtonsDisabled, renderNextCrush } from './ui';
+import { renderTable, renderFormRow, showBanner, setExportButtonsDisabled, renderNextCrush, showInfoModal } from './ui';
 import { isFirebaseConfigured, loginWithGoogle, logout, onAuthChange, saveToCloud, loadFromCloud, getSharedSchedule } from './firebase';
 let state = [];
 let currentUserUid = null;
@@ -225,11 +225,27 @@ function wireTableActions(container) {
         const id = target.dataset.id;
         if (!id)
             return;
-        if (target.classList.contains('btn-edit')) {
+        if (target.classList.contains('btn-edit') || target.closest('.btn-edit')) {
             handleEdit(id);
         }
-        else if (target.classList.contains('btn-delete')) {
+        else if (target.classList.contains('btn-delete') || target.closest('.btn-delete')) {
             handleDelete(id);
+        }
+    });
+    // Handle clicking on the row itself to show info overlay
+    container.addEventListener('click', (e) => {
+        const target = e.target;
+        const tr = target.closest('tr[data-id]');
+        // Ignore clicks inside the actions menu, checkboxes, or inline edit forms
+        if (!tr || target.closest('.menu-container') || target.closest('.batch-delete-cb') || target.closest('.inline-edit')) {
+            return;
+        }
+        const id = tr.getAttribute('data-id');
+        if (!id)
+            return;
+        const row = state.find(r => r.id === id);
+        if (row) {
+            showInfoModal(row, () => handleEdit(id));
         }
     });
 }

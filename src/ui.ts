@@ -282,6 +282,68 @@ export function setExportButtonsDisabled(disabled: boolean): void {
   if (pdfBtn) pdfBtn.disabled = disabled;
 }
 
+/** Displays detailed info modal for a specific sample row. */
+export function showInfoModal(row: ScheduleRow, onEdit: () => void): void {
+  const modal = document.getElementById('info-modal');
+  const content = document.getElementById('info-modal-content');
+  if (!modal || !content) return;
+  
+  const status = row.is_crushed ? 'Crushed' : (daysUntilCrush(row.crush_date) < 0 ? 'Overdue' : 'Pending');
+  const dleft = row.is_crushed ? '—' : (daysUntilCrush(row.crush_date) < 0 ? `${Math.abs(daysUntilCrush(row.crush_date))} days overdue` : `${daysUntilCrush(row.crush_date)} days`);
+
+  content.innerHTML = `
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <span style="font-weight: 500;">Sample Label:</span>
+      <strong style="font-size: 16px;">${escapeHtml(row.sample_label)}</strong>
+    </div>
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <span style="font-weight: 500;">Status:</span>
+      <span style="padding: 4px 10px; background: ${row.is_crushed ? '#e5e7eb' : (daysUntilCrush(row.crush_date) < 0 ? '#fef2f2' : '#eff6ff')}; color: ${row.is_crushed ? '#4b5563' : (daysUntilCrush(row.crush_date) < 0 ? '#991b1b' : '#1e40af')}; border-radius: 20px; font-size: 12px; font-weight: 600; text-transform: uppercase;">${status}</span>
+    </div>
+    <hr style="border: 0; border-top: 1px solid #f3f4f6; margin: 4px 0;" />
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <span style="font-weight: 500;">Casting Date:</span>
+      <span>${formatDisplayDate(row.casting_date)}</span>
+    </div>
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <span style="font-weight: 500;">Curing Offset:</span>
+      <span>${row.curing_offset} days</span>
+    </div>
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <span style="font-weight: 500;">Curing Duration:</span>
+      <span>${row.curing_duration} days</span>
+    </div>
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <span style="font-weight: 500;">Crush Date:</span>
+      <strong style="color: #2563eb;">${formatDisplayDate(row.crush_date)}</strong>
+    </div>
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <span style="font-weight: 500;">Time Remaining:</span>
+      <span style="font-weight: 600;">${dleft}</span>
+    </div>
+  `;
+
+  modal.style.display = 'flex';
+
+  const btnEdit = document.getElementById('btn-info-modal-edit');
+  const btnDone = document.getElementById('btn-info-modal-done');
+  const btnClose = document.getElementById('btn-close-info-modal');
+
+  const closeFn = () => { modal.style.display = 'none'; };
+  const editFn = () => {
+    closeFn();
+    onEdit();
+  };
+
+  if (btnDone) btnDone.onclick = closeFn;
+  if (btnClose) btnClose.onclick = closeFn;
+  if (btnEdit) btnEdit.onclick = editFn;
+  
+  modal.onclick = (e) => {
+    if (e.target === modal) closeFn();
+  };
+}
+
 /**
  * Renders the next-crush countdown card into #next-crush-container.
  * Shows the soonest upcoming (or today's) crush date and a big day number.

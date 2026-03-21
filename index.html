@@ -676,6 +676,23 @@
     </section>
   </div>
 
+    <!-- Info Modal -->
+    <div id="info-modal" class="modal-backdrop" style="display: none;">
+      <section class="card modal-content" style="max-width: 450px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid #e5e7eb; padding-bottom: 12px;">
+          <div class="card-title" style="margin-bottom: 0px; font-size: 14px; font-weight: 700; color: #111827; letter-spacing: 0;">Sample Details</div>
+          <button type="button" id="btn-close-info-modal" class="btn-close" aria-label="Close">&times;</button>
+        </div>
+        <div id="info-modal-content" style="font-size: 14px; color: #374151; display: flex; flex-direction: column; gap: 14px;">
+          <!-- Content populated via JS -->
+        </div>
+        <div style="margin-top: 24px; display: flex; justify-content: flex-end;">
+          <button type="button" id="btn-info-modal-edit" class="btn btn-primary" style="margin-right: 8px;">Edit Sample</button>
+          <button type="button" id="btn-info-modal-done" class="btn btn-secondary">Close</button>
+        </div>
+      </section>
+    </div>
+
     <!-- Import Panel Modal -->
     <div id="import-export-modal" class="modal-backdrop" style="display: none;">
       <section class="card modal-content" style="max-width: 500px;">
