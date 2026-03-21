@@ -283,6 +283,49 @@
     .schedule-table tbody tr:last-child td { border-bottom: none; }
     .schedule-table tbody tr:hover { background: #f9fafb; }
 
+    /* ── Collapsible Groups ── */
+    .group-collapse {
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 6px;
+      margin-bottom: 20px;
+    }
+    .group-summary {
+      background: #f8f9fb;
+      padding: 14px 18px;
+      font-weight: 600;
+      color: #374151;
+      cursor: pointer;
+      user-select: none;
+      list-style: none;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-radius: 6px;
+    }
+    .group-collapse[open] .group-summary {
+      border-bottom-left-radius: 0;
+      border-bottom-right-radius: 0;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .group-summary::-webkit-details-marker { display: none; }
+    .group-summary::after {
+      content: '▼';
+      font-size: 11px;
+      color: #9ca3af;
+      transition: transform 0.2s;
+    }
+    .group-collapse[open] .group-summary::after {
+      transform: rotate(180deg);
+      color: #2563eb;
+    }
+    .group-collapse .schedule-table {
+      border-top: none;
+    }
+    .group-collapse .empty-state {
+      padding: 30px;
+    }
+
     /* ── Next Crush Countdown ── */
     .next-crush-card {
       background: linear-gradient(135deg, #1e40af 0%, #2563eb 100%);
@@ -601,8 +644,8 @@
       </section>
     </div>
 
-    <!-- Schedule Table -->
-    <section class="card">
+    <!-- Schedule Table Sections -->
+    <section class="card" style="background: transparent; border: none; padding: 0;">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
         <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
           <div class="card-title" style="margin-bottom: 0;">Crush Schedule</div>

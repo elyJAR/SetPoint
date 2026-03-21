@@ -6,8 +6,14 @@ import { formatDisplayDate, getRowStatus, daysUntilCrush } from './calc';
  * Sorts rows ascending by crush_date, applies row status CSS classes,
  * and shows an empty-state message when rows is empty.
  */
+let isPendingOpen = true;
+let isCrushedOpen = false;
+
 export function renderTable(rows: ScheduleRow[], container: HTMLElement, groupByName = false): void {
   container.innerHTML = '';
+
+  const pending = rows.filter(r => !r.is_crushed);
+  const crushed = rows.filter(r => r.is_crushed);
 
   if (rows.length === 0) {
     const msg = document.createElement('p');
@@ -17,101 +23,129 @@ export function renderTable(rows: ScheduleRow[], container: HTMLElement, groupBy
     return;
   }
 
-  const table = document.createElement('table');
-  table.className = 'schedule-table';
+  function buildTable(data: ScheduleRow[], isCrushedGroup: boolean) {
+    const table = document.createElement('table');
+    table.className = 'schedule-table';
 
-  // Header
-  const thead = document.createElement('thead');
-  thead.innerHTML = `
-    <tr>
-      <th style="width: 30px;"><input type="checkbox" id="batch-delete-all" title="Select All for Batch Delete" /></th>
-      <th style="width: 40px;">S/N</th>
-      <th>Sample Label</th>
-      <th>Casting Date</th>
-      <th>Offset (days)</th>
-      <th>Curing Duration (days)</th>
-      <th>Crush Date</th>
-      <th>Days Left</th>
-      <th>Actions</th>
-    </tr>
-  `;
-  table.appendChild(thead);
-
-  const tbody = document.createElement('tbody');
-
-  function createRow(row: ScheduleRow, rowIndex: number) {
-    let status = getRowStatus(row.crush_date) as string;
-    if (row.is_crushed) status = 'crushed';
-
-    const days = daysUntilCrush(row.crush_date);
-    const daysLabel = row.is_crushed ? 'Done' : (days < 0
-      ? `${Math.abs(days)}d overdue`
-      : days === 0
-        ? 'Today'
-        : `${days}d`);
-
-    const tr = document.createElement('tr');
-    tr.className = `row--${status}`;
-    tr.dataset.id = row.id;
-
-    tr.innerHTML = `
-      <td><input type="checkbox" class="batch-delete-cb" value="${escapeHtml(row.id)}" /></td>
-      <td>${rowIndex}</td>
-      <td>${escapeHtml(row.sample_label)}</td>
-      <td>${formatDisplayDate(row.casting_date)}</td>
-      <td>${row.curing_offset}d</td>
-      <td>${row.curing_duration}</td>
-      <td>${formatDisplayDate(row.crush_date)}</td>
-      <td class="days-left days-left--${status}">${daysLabel}</td>
-      <td>
-        <label style="display: inline-flex; align-items: center; gap: 4px; cursor: pointer; white-space: nowrap; margin-right: 8px;">
-          <input type="checkbox" class="cb-crushed" data-id="${escapeHtml(row.id)}" ${row.is_crushed ? 'checked' : ''} /> Done
-        </label>
-        <button class="btn-edit" data-id="${escapeHtml(row.id)}">Edit</button>
-        <button class="btn-delete" data-id="${escapeHtml(row.id)}">Delete</button>
-      </td>
+    const thead = document.createElement('thead');
+    thead.innerHTML = `
+      <tr>
+        <th style="width: 30px;"><input type="checkbox" ${isCrushedGroup ? 'disabled' : 'id="batch-delete-all"'} class="batch-delete-all-dynamic" title="Select All for Batch Delete" /></th>
+        <th style="width: 40px;">S/N</th>
+        <th>Sample Label</th>
+        <th>Casting Date</th>
+        <th>Offset (days)</th>
+        <th>Curing Duration (days)</th>
+        <th>Crush Date</th>
+        <th>Days Left</th>
+        <th>Actions</th>
+      </tr>
     `;
-    return tr;
+    table.appendChild(thead);
+
+    const tbody = document.createElement('tbody');
+
+    function createRow(row: ScheduleRow, rowIndex: number) {
+      let status = getRowStatus(row.crush_date) as string;
+      if (row.is_crushed) status = 'crushed';
+
+      const days = daysUntilCrush(row.crush_date);
+      const daysLabel = row.is_crushed ? 'Done' : (days < 0
+        ? `${Math.abs(days)}d overdue`
+        : days === 0
+          ? 'Today'
+          : `${days}d`);
+
+      const tr = document.createElement('tr');
+      tr.className = `row--${status}`;
+      tr.dataset.id = row.id;
+
+      tr.innerHTML = `
+        <td><input type="checkbox" class="batch-delete-cb" value="${escapeHtml(row.id)}" /></td>
+        <td>${rowIndex}</td>
+        <td>${escapeHtml(row.sample_label)}</td>
+        <td>${formatDisplayDate(row.casting_date)}</td>
+        <td>${row.curing_offset}d</td>
+        <td>${row.curing_duration}</td>
+        <td>${formatDisplayDate(row.crush_date)}</td>
+        <td class="days-left days-left--${status}">${daysLabel}</td>
+        <td>
+          <label style="display: inline-flex; align-items: center; gap: 4px; cursor: pointer; white-space: nowrap; margin-right: 8px;">
+            <input type="checkbox" class="cb-crushed" data-id="${escapeHtml(row.id)}" ${row.is_crushed ? 'checked' : ''} /> Done
+          </label>
+          <button class="btn-edit" data-id="${escapeHtml(row.id)}">Edit</button>
+          <button class="btn-delete" data-id="${escapeHtml(row.id)}">Delete</button>
+        </td>
+      `;
+      return tr;
+    }
+
+    if (groupByName) {
+      const groupedSorted = [...data].sort((a, b) => {
+        const nameCmp = a.sample_label.localeCompare(b.sample_label, undefined, { numeric: true, sensitivity: 'base' });
+        if (nameCmp !== 0) return nameCmp;
+        return a.crush_date < b.crush_date ? -1 : a.crush_date > b.crush_date ? 1 : 0;
+      });
+
+      let currentGroup = '';
+      let rowIndex = 1;
+      for (const row of groupedSorted) {
+        if (row.sample_label !== currentGroup) {
+          currentGroup = row.sample_label;
+          const groupTr = document.createElement('tr');
+          groupTr.innerHTML = `
+            <td colspan="9" style="background: #e5e7eb; font-weight: bold; padding: 10px 14px; text-transform: uppercase; font-size: 11px; letter-spacing: 0.05em; color: #4b5563;">
+              ${escapeHtml(currentGroup)}
+            </td>
+          `;
+          tbody.appendChild(groupTr);
+        }
+        tbody.appendChild(createRow(row, rowIndex++));
+      }
+    } else {
+      const sorted = [...data].sort((a, b) => {
+        if (a.crush_date !== b.crush_date) {
+          return a.crush_date < b.crush_date ? -1 : 1;
+        }
+        return a.sample_label.localeCompare(b.sample_label, undefined, { numeric: true, sensitivity: 'base' });
+      });
+      
+      let rowIndex = 1;
+      for (const row of sorted) {
+        tbody.appendChild(createRow(row, rowIndex++));
+      }
+    }
+
+    table.appendChild(tbody);
+    return table;
   }
 
-  if (groupByName) {
-    const groupedSorted = [...rows].sort((a, b) => {
-      const nameCmp = a.sample_label.localeCompare(b.sample_label, undefined, { numeric: true, sensitivity: 'base' });
-      if (nameCmp !== 0) return nameCmp;
-      return a.crush_date < b.crush_date ? -1 : a.crush_date > b.crush_date ? 1 : 0;
-    });
-
-    let currentGroup = '';
-    let rowIndex = 1;
-    for (const row of groupedSorted) {
-      if (row.sample_label !== currentGroup) {
-        currentGroup = row.sample_label;
-        const groupTr = document.createElement('tr');
-        groupTr.innerHTML = `
-          <td colspan="9" style="background: #e5e7eb; font-weight: bold; padding: 10px 14px; text-transform: uppercase; font-size: 11px; letter-spacing: 0.05em; color: #4b5563;">
-            ${escapeHtml(currentGroup)}
-          </td>
-        `;
-        tbody.appendChild(groupTr);
-      }
-      tbody.appendChild(createRow(row, rowIndex++));
-    }
-  } else {
-    const sorted = [...rows].sort((a, b) => {
-      if (a.crush_date !== b.crush_date) {
-        return a.crush_date < b.crush_date ? -1 : 1;
-      }
-      return a.sample_label.localeCompare(b.sample_label, undefined, { numeric: true, sensitivity: 'base' });
-    });
+  if (pending.length > 0 || rows.length === 0) {
+    const details = document.createElement('details');
+    details.className = 'group-collapse';
+    details.open = isPendingOpen;
+    details.addEventListener('toggle', () => isPendingOpen = details.open);
     
-    let rowIndex = 1;
-    for (const row of sorted) {
-      tbody.appendChild(createRow(row, rowIndex++));
+    details.innerHTML = `<summary class="group-summary">Pending Samples (${pending.length})</summary>`;
+    
+    if (pending.length === 0) {
+      details.innerHTML += '<p class="empty-state">No pending samples.</p>';
+    } else {
+      details.appendChild(buildTable(pending, false));
     }
+    container.appendChild(details);
   }
 
-  table.appendChild(tbody);
-  container.appendChild(table);
+  if (crushed.length > 0) {
+    const details = document.createElement('details');
+    details.className = 'group-collapse';
+    details.open = isCrushedOpen;
+    details.addEventListener('toggle', () => isCrushedOpen = details.open);
+    
+    details.innerHTML = `<summary class="group-summary">Crushed Samples (${crushed.length})</summary>`;
+    details.appendChild(buildTable(crushed, true));
+    container.appendChild(details);
+  }
 }
 
 /**
