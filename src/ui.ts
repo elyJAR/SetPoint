@@ -9,6 +9,27 @@ import { formatDisplayDate, getRowStatus, daysUntilCrush } from './calc';
 let isPendingOpen = true;
 let isCrushedOpen = false;
 
+// Global click listener to handle dropdown menu toggles natively
+document.addEventListener('click', (e) => {
+  const target = e.target as HTMLElement;
+  const trigger = target.closest('.menu-trigger');
+  
+  if (trigger) {
+    const actId = trigger.getAttribute('data-id');
+    const menu = document.getElementById(`menu-${actId}`);
+    const isShowing = menu?.classList.contains('show');
+    
+    // Close all open menus first
+    document.querySelectorAll('.dropdown-menu.show').forEach(m => m.classList.remove('show'));
+    
+    if (menu && !isShowing) {
+      menu.classList.add('show');
+    }
+  } else if (!target.closest('.dropdown-menu')) {
+    document.querySelectorAll('.dropdown-menu.show').forEach(m => m.classList.remove('show'));
+  }
+});
+
 export function renderTable(rows: ScheduleRow[], container: HTMLElement, groupByName = false): void {
   container.innerHTML = '';
 
@@ -69,12 +90,22 @@ export function renderTable(rows: ScheduleRow[], container: HTMLElement, groupBy
         <td>${row.curing_duration}</td>
         <td>${formatDisplayDate(row.crush_date)}</td>
         <td class="days-left days-left--${status}">${daysLabel}</td>
-        <td>
-          <label style="display: inline-flex; align-items: center; gap: 4px; cursor: pointer; white-space: nowrap; margin-right: 8px;">
-            <input type="checkbox" class="cb-crushed" data-id="${escapeHtml(row.id)}" ${row.is_crushed ? 'checked' : ''} /> Done
-          </label>
-          <button class="btn-edit" data-id="${escapeHtml(row.id)}">Edit</button>
-          <button class="btn-delete" data-id="${escapeHtml(row.id)}">Delete</button>
+        <td class="menu-container">
+          <button class="btn-icon menu-trigger" data-id="${escapeHtml(row.id)}" title="Actions">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+          </button>
+          <div class="dropdown-menu" id="menu-${escapeHtml(row.id)}">
+            <label class="dropdown-item">
+              <input type="checkbox" class="cb-crushed" data-id="${escapeHtml(row.id)}" ${row.is_crushed ? 'checked' : ''} style="accent-color: #2563eb;" />
+              ${row.is_crushed ? 'Mark Pending' : 'Mark Crushed'}
+            </label>
+            <button class="dropdown-item btn-edit" data-id="${escapeHtml(row.id)}">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg> Edit
+            </button>
+            <button class="dropdown-item btn-delete text-red" data-id="${escapeHtml(row.id)}">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg> Delete
+            </button>
+          </div>
         </td>
       `;
       return tr;

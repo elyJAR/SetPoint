@@ -283,6 +283,58 @@
     .schedule-table tbody tr:last-child td { border-bottom: none; }
     .schedule-table tbody tr:hover { background: #f9fafb; }
 
+    /* ── Dropdown Menu ── */
+    .menu-container {
+      position: relative;
+    }
+    .btn-icon {
+      background: none;
+      border: none;
+      padding: 4px;
+      cursor: pointer;
+      color: #6b7280;
+      border-radius: 4px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.15s, color 0.15s;
+    }
+    .btn-icon:hover { background: #e5e7eb; color: #1a1d23; }
+    
+    .dropdown-menu {
+      position: absolute;
+      right: 0;
+      top: 100%;
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 6px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+      width: 140px;
+      padding: 4px;
+      margin-top: 4px;
+      z-index: 1000;
+      display: none;
+    }
+    .dropdown-menu.show { display: block; }
+    .dropdown-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+      padding: 8px 12px;
+      font-size: 13px;
+      color: #374151;
+      background: none;
+      border: none;
+      text-align: left;
+      cursor: pointer;
+      border-radius: 4px;
+      white-space: nowrap;
+    }
+    .dropdown-item:hover { background: #f3f4f6; }
+    .dropdown-item.text-red { color: #dc2626; }
+    .dropdown-item.text-red:hover { background: #fef2f2; }
+
     /* ── Collapsible Groups ── */
     .group-collapse {
       background: #fff;
