@@ -17,6 +17,12 @@ jobs:
 
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+      VITE_FIREBASE_API_KEY: "AIzaSyBFNXQjtrIdfOxdFcw8q1q14KKSsIsA8mI"
+      VITE_FIREBASE_AUTH_DOMAIN: "setpoint-c.firebaseapp.com"
+      VITE_FIREBASE_PROJECT_ID: "setpoint-c"
+      VITE_FIREBASE_STORAGE_BUCKET: "setpoint-c.firebasestorage.app"
+      VITE_FIREBASE_MESSAGING_SENDER_ID: "366233977678"
+      VITE_FIREBASE_APP_ID: "1:366233977678:web:d291ad6a1fa17db078941f"
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
