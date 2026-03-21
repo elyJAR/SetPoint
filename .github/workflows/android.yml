@@ -16,10 +16,10 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: 18
 
@@ -30,7 +30,7 @@ jobs:
         run: npm run build
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
@@ -43,11 +43,15 @@ jobs:
         working-directory: ./android
         run: ./gradlew assembleDebug
 
+      - name: Rename APK
+        working-directory: ./android/app/build/outputs/apk/debug
+        run: mv app-debug.apk SetPoint.apk
+
       - name: Upload APK as Artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: app-debug.apk
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          name: SetPoint.apk
+          path: android/app/build/outputs/apk/debug/SetPoint.apk
 
       - name: Create or Update GitHub Pre-Release
         env:
@@ -58,7 +62,7 @@ jobs:
           
           # Create a new pre-release tagged "latest"
           gh release create latest \
-            android/app/build/outputs/apk/debug/app-debug.apk \
+            android/app/build/outputs/apk/debug/SetPoint.apk \
             --title "Latest Pre-release Build" \
             --notes "Automated Android APK build from the latest commit (${{ github.sha }})." \
             --prerelease \
