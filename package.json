@@ -12,7 +12,6 @@
     "@capacitor/core": "^8.2.0",
     "@capacitor/local-notifications": "^8.0.2",
     "@capacitor/status-bar": "^8.0.1",
-    "@codetrix-studio/capacitor-google-auth": "^3.4.0-rc.4",
     "firebase": "^12.11.0",
     "jspdf": "^2.5.1"
   },

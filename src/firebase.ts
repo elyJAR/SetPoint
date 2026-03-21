@@ -1,8 +1,7 @@
 import { initializeApp } from 'firebase/app';
 import { 
-  getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged, User, signInWithCredential 
+  getAuth, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, signOut, onAuthStateChanged, User 
 } from 'firebase/auth';
-import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth';
 import { Capacitor } from '@capacitor/core';
 import { 
   getFirestore, doc, setDoc, getDoc 
@@ -34,19 +33,23 @@ if (isFirebaseConfigured) {
 
 export async function loginWithGoogle(): Promise<User | null> {
   if (!auth) throw new Error("Firebase not configured. Please add config to .env");
+  const provider = new GoogleAuthProvider();
   
   if (Capacitor.isNativePlatform()) {
-    // Native mobile flow: account picker
-    const user = await GoogleAuth.signIn();
-    const credential = GoogleAuthProvider.credential(user.authentication.idToken);
-    const res = await signInWithCredential(auth, credential);
-    return res.user;
+    // Mobile flow: Use redirect (more reliable in WebViews)
+    await signInWithRedirect(auth, provider);
+    return null; // The app will redirect away
   } else {
-    // Web flow: popup
-    const provider = new GoogleAuthProvider();
+    // Web flow: Use popup
     const res = await signInWithPopup(auth, provider);
     return res.user;
   }
+}
+
+export async function handleRedirectResult(): Promise<User | null> {
+  if (!auth) return null;
+  const res = await getRedirectResult(auth);
+  return res?.user || null;
 }
 
 export async function logout(): Promise<void> {
