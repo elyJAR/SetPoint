@@ -53,12 +53,6 @@ jobs:
         working-directory: ./android/app/build/outputs/apk/debug
         run: mv app-debug.apk SetPoint.apk
 
-      - name: Upload APK as Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: SetPoint.apk
-          path: android/app/build/outputs/apk/debug/SetPoint.apk
-
       - name: Create or Update GitHub Pre-Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
