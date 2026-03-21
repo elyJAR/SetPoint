@@ -3,6 +3,7 @@ export interface ScheduleRow {
   sample_label: string;    // non-empty, trimmed
   casting_date: string;    // "YYYY-MM-DD" (ISO, stored internally)
   curing_duration: number; // positive integer (days)
+  curing_offset: number;   // number of days after casting when curing starts (e.g. 0 for same day, 1 for day after)
   crush_date: string;      // "YYYY-MM-DD" (ISO, derived, stored for fast sort)
 }
 

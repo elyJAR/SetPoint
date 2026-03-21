@@ -52,7 +52,8 @@ function makeRow(overrides: Partial<ScheduleRow> = {}): ScheduleRow {
     sample_label: 'Beam-01',
     casting_date: '2025-01-01',
     curing_duration: 28,
-    crush_date: '2025-01-30',
+    curing_offset: 0,
+    crush_date: '2025-01-29',
     ...overrides,
   };
 }
@@ -64,6 +65,7 @@ const arbRow: fc.Arbitrary<ScheduleRow> = fc.record({
     (d) => d.toISOString().slice(0, 10)
   ),
   curing_duration: fc.integer({ min: 1, max: 365 }),
+  curing_offset: fc.integer({ min: 0, max: 7 }),
   crush_date: fc.date({ min: new Date('2000-01-01'), max: new Date('2099-12-31') }).map(
     (d) => d.toISOString().slice(0, 10)
   ),

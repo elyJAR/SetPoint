@@ -1,10 +1,10 @@
 import type { ScheduleRow, ImportResult } from './types';
 import { parseDisplayDate, formatDisplayDate, calcCrushDate } from './calc';
 
-const HEADER = 'sample_label,casting_date,curing_duration,crush_date';
+const HEADER = 'sample_label,casting_date,curing_duration,curing_offset,crush_date';
 
 /**
- * Parses CSV text with header: sample_label,casting_date,curing_duration,crush_date
+ * Parses CSV text with header: sample_label,casting_date,curing_duration,curing_offset,crush_date
  * Validates each row and skips invalid ones with a reason.
  * crush_date column in CSV is ignored — always recalculated.
  */
@@ -24,6 +24,7 @@ export function parseCSV(text: string): ImportResult {
     const sample_label = (cols[0] ?? '').trim();
     const casting_date_raw = (cols[1] ?? '').trim();
     const curing_duration_raw = (cols[2] ?? '').trim();
+    const curing_offset_raw = (cols[3] ?? '').trim();
 
     if (!sample_label) {
       skipped.push({ row: rowNumber, reason: 'Missing sample label' });
@@ -42,7 +43,11 @@ export function parseCSV(text: string): ImportResult {
       return;
     }
 
-    const crush_date = calcCrushDate(casting_date, curingNum);
+    // Try to parse offset. If it's missing or look like a date string (from old CSV format), default to 0.
+    let curing_offset = parseInt(curing_offset_raw, 10);
+    if (isNaN(curing_offset)) curing_offset = 0;
+
+    const crush_date = calcCrushDate(casting_date, curingNum, curing_offset);
     const id = typeof crypto !== 'undefined' && crypto.randomUUID
       ? crypto.randomUUID()
       : Date.now().toString() + Math.random().toString(36).slice(2);
@@ -52,6 +57,7 @@ export function parseCSV(text: string): ImportResult {
       sample_label,
       casting_date,
       curing_duration: curingNum,
+      curing_offset,
       crush_date,
     });
   });
@@ -64,11 +70,18 @@ export function parseCSV(text: string): ImportResult {
  * Dates are formatted as DD/MM/YYYY in output.
  */
 export function generateCSV(rows: ScheduleRow[]): string {
+  const sortedRows = [...rows].sort((a, b) => {
+    if (a.crush_date !== b.crush_date) {
+      return a.crush_date < b.crush_date ? -1 : 1;
+    }
+    return a.sample_label.localeCompare(b.sample_label, undefined, { numeric: true, sensitivity: 'base' });
+  });
+
   const lines = [HEADER];
-  for (const row of rows) {
+  for (const row of sortedRows) {
     const castingDisplay = formatDisplayDate(row.casting_date);
     const crushDisplay = formatDisplayDate(row.crush_date);
-    lines.push(`${row.sample_label},${castingDisplay},${row.curing_duration},${crushDisplay}`);
+    lines.push(`${row.sample_label},${castingDisplay},${row.curing_duration},${row.curing_offset},${crushDisplay}`);
   }
   return lines.join('\n');
 }
@@ -77,5 +90,5 @@ export function generateCSV(rows: ScheduleRow[]): string {
  * Returns a CSV string with the header row plus one example row.
  */
 export function generateTemplate(): string {
-  return `${HEADER}\nBeam-01,01/07/2025,28,30/07/2025`;
+  return `${HEADER}\nBeam-01,16/03/2026,28,0,13/04/2026`;
 }

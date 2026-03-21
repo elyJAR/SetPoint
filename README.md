@@ -34,9 +34,9 @@ All data is stored locally in the browser — no server, no account, no internet
 
 In concrete testing, cylindrical or cuboid samples are cast on a specific date and must be crushed (compression-tested) after a defined curing period. The curing period begins the day after casting, meaning:
 
-- A sample cast on **16 March 2026** with a **28-day** curing period must be crushed on **14 April 2026**.
+- A sample cast on **16 March 2026** with a **28-day** curing period is scheduled for crushing on **13 April 2026** (by default).
 
-Managing multiple samples across multiple curing durations manually is error-prone. SetPoint automates this calculation and keeps the entire schedule visible at a glance.
+Managing multiple samples across multiple curing durations manually is error-prone. SetPoint automates this calculation, lets you specify when curing starts (e.g. same day or day after), and keeps the entire schedule visible at a glance.
 
 ---
 
@@ -57,16 +57,14 @@ Managing multiple samples across multiple curing durations manually is error-pro
 ## Crush Date Formula
 
 ```
-Crush Date = Casting Date + 1 day + Curing Duration (days)
+Crush Date = Casting Date + Offset (days) + Curing Duration (days)
 ```
 
-The `+1` accounts for the fact that curing begins the day after casting. For example:
+The `Offset` represents when curing begins relative to casting. By default, this is **0** (same day), but can be adjusted to **1** (day after) or more if needed. For example:
 
-| Casting Date | Curing Duration | Crush Date       |
-|--------------|-----------------|------------------|
-| 16/03/2026   | 7 days          | 24/03/2026       |
-| 16/03/2026   | 28 days         | 14/04/2026       |
-| 16/03/2026   | 90 days         | 15/06/2026       |
+| 16/03/2026   | 0d     | 7 days          | 23/03/2026       |
+| 16/03/2026   | 0d     | 28 days         | 13/04/2026       |
+| 16/03/2026   | 1d     | 7 days          | 24/03/2026       |
 
 Dates are stored internally as ISO `YYYY-MM-DD` strings and displayed in `DD/MM/YYYY` format throughout the UI.
 
@@ -193,10 +191,10 @@ The blue card at the top of the page shows a live countdown to the nearest upcom
 Click **Import CSV** and select a `.csv` file. The expected format is:
 
 ```
-sample_label,casting_date,curing_duration
-Beam-01,16/03/2026,28
-Beam-01,16/03/2026,7
-Cylinder-A,01/03/2026,14
+sample_label,casting_date,curing_duration,curing_offset
+Beam-01,16/03/2026,28,0
+Beam-01,16/03/2026,7,1
+Cylinder-A,01/03/2026,14,0
 ```
 
 - `casting_date` must be in `DD/MM/YYYY` format

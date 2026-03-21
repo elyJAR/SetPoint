@@ -2,8 +2,8 @@ import { jsPDF } from 'jspdf';
 import { ScheduleRow } from './types';
 import { formatDisplayDate } from './calc';
 
-const COLUMNS = ['Sample Label', 'Casting Date', 'Curing Duration (days)', 'Crush Date'];
-const COL_WIDTHS = [60, 40, 50, 40]; // mm
+const COLUMNS = ['S/N', 'Sample Label', 'Casting Date', 'Curing Duration (days)', 'Crush Date'];
+const COL_WIDTHS = [15, 55, 35, 45, 40]; // mm
 const ROW_HEIGHT = 8; // mm
 const MARGIN_LEFT = 14;
 const MARGIN_TOP = 20;
@@ -46,7 +46,15 @@ export function generatePDF(rows: ScheduleRow[]): string | null {
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(0, 0, 0);
 
-    rows.forEach((row, rowIndex) => {
+    // Sort rows
+    const sortedRows = [...rows].sort((a, b) => {
+      if (a.crush_date !== b.crush_date) {
+        return a.crush_date < b.crush_date ? -1 : 1;
+      }
+      return a.sample_label.localeCompare(b.sample_label, undefined, { numeric: true, sensitivity: 'base' });
+    });
+
+    sortedRows.forEach((row, rowIndex) => {
       const y = headerY + ROW_HEIGHT * (rowIndex + 1);
       x = MARGIN_LEFT;
 
@@ -57,6 +65,7 @@ export function generatePDF(rows: ScheduleRow[]): string | null {
       }
 
       const cells = [
+        String(rowIndex + 1),
         row.sample_label,
         formatDisplayDate(row.casting_date),
         String(row.curing_duration),

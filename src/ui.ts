@@ -6,7 +6,7 @@ import { formatDisplayDate, getRowStatus, daysUntilCrush } from './calc';
  * Sorts rows ascending by crush_date, applies row status CSS classes,
  * and shows an empty-state message when rows is empty.
  */
-export function renderTable(rows: ScheduleRow[], container: HTMLElement): void {
+export function renderTable(rows: ScheduleRow[], container: HTMLElement, groupByName = false): void {
   container.innerHTML = '';
 
   if (rows.length === 0) {
@@ -17,10 +17,6 @@ export function renderTable(rows: ScheduleRow[], container: HTMLElement): void {
     return;
   }
 
-  const sorted = [...rows].sort((a, b) =>
-    a.crush_date < b.crush_date ? -1 : a.crush_date > b.crush_date ? 1 : 0
-  );
-
   const table = document.createElement('table');
   table.className = 'schedule-table';
 
@@ -28,8 +24,11 @@ export function renderTable(rows: ScheduleRow[], container: HTMLElement): void {
   const thead = document.createElement('thead');
   thead.innerHTML = `
     <tr>
+      <th style="width: 30px;"><input type="checkbox" id="batch-delete-all" title="Select All for Batch Delete" /></th>
+      <th style="width: 40px;">S/N</th>
       <th>Sample Label</th>
       <th>Casting Date</th>
+      <th>Offset (days)</th>
       <th>Curing Duration (days)</th>
       <th>Crush Date</th>
       <th>Days Left</th>
@@ -38,9 +37,9 @@ export function renderTable(rows: ScheduleRow[], container: HTMLElement): void {
   `;
   table.appendChild(thead);
 
-  // Body
   const tbody = document.createElement('tbody');
-  for (const row of sorted) {
+
+  function createRow(row: ScheduleRow, rowIndex: number) {
     const status = getRowStatus(row.crush_date);
     const days = daysUntilCrush(row.crush_date);
     const daysLabel = days < 0
@@ -54,8 +53,11 @@ export function renderTable(rows: ScheduleRow[], container: HTMLElement): void {
     tr.dataset.id = row.id;
 
     tr.innerHTML = `
+      <td><input type="checkbox" class="batch-delete-cb" value="${escapeHtml(row.id)}" /></td>
+      <td>${rowIndex}</td>
       <td>${escapeHtml(row.sample_label)}</td>
       <td>${formatDisplayDate(row.casting_date)}</td>
+      <td>${row.curing_offset}d</td>
       <td>${row.curing_duration}</td>
       <td>${formatDisplayDate(row.crush_date)}</td>
       <td class="days-left days-left--${status}">${daysLabel}</td>
@@ -64,8 +66,45 @@ export function renderTable(rows: ScheduleRow[], container: HTMLElement): void {
         <button class="btn-delete" data-id="${escapeHtml(row.id)}">Delete</button>
       </td>
     `;
-    tbody.appendChild(tr);
+    return tr;
   }
+
+  if (groupByName) {
+    const groupedSorted = [...rows].sort((a, b) => {
+      const nameCmp = a.sample_label.localeCompare(b.sample_label, undefined, { numeric: true, sensitivity: 'base' });
+      if (nameCmp !== 0) return nameCmp;
+      return a.crush_date < b.crush_date ? -1 : a.crush_date > b.crush_date ? 1 : 0;
+    });
+
+    let currentGroup = '';
+    let rowIndex = 1;
+    for (const row of groupedSorted) {
+      if (row.sample_label !== currentGroup) {
+        currentGroup = row.sample_label;
+        const groupTr = document.createElement('tr');
+        groupTr.innerHTML = `
+          <td colspan="9" style="background: #e5e7eb; font-weight: bold; padding: 10px 14px; text-transform: uppercase; font-size: 11px; letter-spacing: 0.05em; color: #4b5563;">
+            ${escapeHtml(currentGroup)}
+          </td>
+        `;
+        tbody.appendChild(groupTr);
+      }
+      tbody.appendChild(createRow(row, rowIndex++));
+    }
+  } else {
+    const sorted = [...rows].sort((a, b) => {
+      if (a.crush_date !== b.crush_date) {
+        return a.crush_date < b.crush_date ? -1 : 1;
+      }
+      return a.sample_label.localeCompare(b.sample_label, undefined, { numeric: true, sensitivity: 'base' });
+    });
+    
+    let rowIndex = 1;
+    for (const row of sorted) {
+      tbody.appendChild(createRow(row, rowIndex++));
+    }
+  }
+
   table.appendChild(tbody);
   container.appendChild(table);
 }
@@ -94,7 +133,18 @@ export function renderFormRow(index: number): HTMLElement {
       placeholder="DD/MM/YYYY"
       aria-label="Casting date"
     />
+    <input
+      type="number"
+      class="input-offset"
+      name="curing_offset_${index}"
+      value="0"
+      min="0"
+      placeholder="Offset (days)"
+      title="Curing start offset (0 = same day, 1 = day after)"
+    />
     <div class="checkbox-group">
+      <label class="checkbox-label checkbox-select-all" title="Select All"><input type="checkbox" class="duration-select-all" /> All</label>
+      <span class="checkbox-divider"></span>
       <label class="checkbox-label"><input type="checkbox" class="duration-checkbox" value="7" /> 7d</label>
       <label class="checkbox-label"><input type="checkbox" class="duration-checkbox" value="14" /> 14d</label>
       <label class="checkbox-label"><input type="checkbox" class="duration-checkbox" value="21" /> 21d</label>
@@ -104,7 +154,7 @@ export function renderFormRow(index: number): HTMLElement {
     </div>
     <button
       type="button"
-      class="btn-remove-row"
+      class="btn-remove-row btn btn-danger btn-sm"
       style="${index === 0 ? 'display:none' : ''}"
       aria-label="Remove this row"
     >Remove</button>

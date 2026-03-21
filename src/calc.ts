@@ -1,12 +1,12 @@
 import { RowStatus } from './types';
 
 /**
- * Calculates the crush date given a casting date and curing duration.
- * Crush_Date = Casting_Date + 1 + curingDays calendar days
+ * Calculates the crush date given a casting date, curing duration, and offset.
+ * Crush_Date = Casting_Date + offset + curingDays
  */
-export function calcCrushDate(castingDateISO: string, curingDays: number): string {
+export function calcCrushDate(castingDateISO: string, curingDays: number, offset: number = 0): string {
   const d = new Date(castingDateISO);
-  d.setDate(d.getDate() + 1 + curingDays);
+  d.setDate(d.getDate() + offset + curingDays);
   return d.toISOString().slice(0, 10); // "YYYY-MM-DD"
 }
 

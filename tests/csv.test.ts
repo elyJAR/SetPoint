@@ -14,7 +14,8 @@ function makeRow(overrides: Partial<ScheduleRow> = {}): ScheduleRow {
     sample_label: 'Beam-01',
     casting_date: '2025-07-01',
     curing_duration: 28,
-    crush_date: '2025-07-30',
+    curing_offset: 0,
+    crush_date: '2025-07-29',
     ...overrides,
   };
 }
@@ -28,13 +29,15 @@ const arbValidRow: fc.Arbitrary<ScheduleRow> = fc
       .date({ min: new Date('2000-01-01'), max: new Date('2099-12-31') })
       .map(d => d.toISOString().slice(0, 10)),
     curing_duration: fc.integer({ min: 1, max: 365 }),
+    curing_offset: fc.integer({ min: 0, max: 7 }),
   })
-  .map(({ id, sample_label, casting_date, curing_duration }) => ({
+  .map(({ id, sample_label, casting_date, curing_duration, curing_offset }) => ({
     id,
     sample_label,
     casting_date,
     curing_duration,
-    crush_date: calcCrushDate(casting_date, curing_duration),
+    curing_offset,
+    crush_date: calcCrushDate(casting_date, curing_duration, curing_offset),
   }));
 
 // ---------------------------------------------------------------------------
@@ -45,14 +48,14 @@ describe('generateTemplate', () => {
   it('has the correct header row', () => {
     const template = generateTemplate();
     const firstLine = template.split('\n')[0];
-    expect(firstLine).toBe('sample_label,casting_date,curing_duration,crush_date');
+    expect(firstLine).toBe('sample_label,casting_date,curing_duration,curing_offset,crush_date');
   });
 
   it('has an example data row', () => {
     const template = generateTemplate();
     const lines = template.split('\n');
     expect(lines.length).toBeGreaterThanOrEqual(2);
-    expect(lines[1]).toBe('Beam-01,01/07/2025,28,30/07/2025');
+    expect(lines[1]).toBe('Beam-01,16/03/2026,28,0,13/04/2026');
   });
 });
 
@@ -61,12 +64,12 @@ describe('generateCSV', () => {
     const rows = [makeRow()];
     const csv = generateCSV(rows);
     expect(csv).toContain('01/07/2025'); // casting_date
-    expect(csv).toContain('30/07/2025'); // crush_date
+    expect(csv).toContain('29/07/2025'); // crush_date
   });
 
   it('includes header row', () => {
     const csv = generateCSV([makeRow()]);
-    expect(csv.startsWith('sample_label,casting_date,curing_duration,crush_date')).toBe(true);
+    expect(csv.startsWith('sample_label,casting_date,curing_duration,curing_offset,crush_date')).toBe(true);
   });
 
   it('produces one data row per ScheduleRow', () => {
@@ -79,14 +82,15 @@ describe('generateCSV', () => {
 
 describe('parseCSV', () => {
   it('parses a valid CSV and returns added rows', () => {
-    const csv = 'sample_label,casting_date,curing_duration,crush_date\nBeam-01,01/07/2025,28,30/07/2025';
+    const csv = 'sample_label,casting_date,curing_duration,curing_offset,crush_date\nBeam-01,01/07/2025,28,0,29/07/2025';
     const result = parseCSV(csv);
     expect(result.added).toHaveLength(1);
     expect(result.skipped).toHaveLength(0);
     expect(result.added[0].sample_label).toBe('Beam-01');
     expect(result.added[0].casting_date).toBe('2025-07-01');
     expect(result.added[0].curing_duration).toBe(28);
-    expect(result.added[0].crush_date).toBe('2025-07-30');
+    expect(result.added[0].curing_offset).toBe(0);
+    expect(result.added[0].crush_date).toBe('2025-07-29');
   });
 
   it('skips row with missing label', () => {
@@ -136,9 +140,9 @@ describe('parseCSV', () => {
 
   it('recalculates crush_date ignoring the CSV crush_date column', () => {
     // CSV has wrong crush_date — should be recalculated
-    const csv = 'sample_label,casting_date,curing_duration,crush_date\nBeam-01,01/07/2025,28,01/01/2000';
+    const csv = 'sample_label,casting_date,curing_duration,curing_offset,crush_date\nBeam-01,01/07/2025,28,0,01/01/2000';
     const result = parseCSV(csv);
-    expect(result.added[0].crush_date).toBe('2025-07-30');
+    expect(result.added[0].crush_date).toBe('2025-07-29');
   });
 });
 
@@ -181,7 +185,7 @@ describe('Property 12: CSV Import Skips Invalid Rows', () => {
 
     // Arbitrary for a valid CSV data row string
     const arbValidDataRow = arbValidRow.map(row =>
-      `${row.sample_label},${formatDisplayDate(row.casting_date)},${row.curing_duration},${formatDisplayDate(row.crush_date)}`
+      `${row.sample_label},${formatDisplayDate(row.casting_date)},${row.curing_duration},${row.curing_offset},${formatDisplayDate(row.crush_date)}`
     );
 
     // Arbitrary for an invalid CSV data row string
@@ -211,7 +215,7 @@ describe('Property 12: CSV Import Skips Invalid Rows', () => {
           { minLength: 1, maxLength: 20 }
         ),
         (rowEntries) => {
-          const header = 'sample_label,casting_date,curing_duration,crush_date';
+          const header = 'sample_label,casting_date,curing_duration,curing_offset,crush_date';
           const dataRows = rowEntries.map(e => e.row);
           const csv = [header, ...dataRows].join('\n');
 
