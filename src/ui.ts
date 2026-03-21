@@ -290,49 +290,65 @@ export function renderNextCrush(rows: ScheduleRow[]): void {
     ? `Crush today — ${labels}`
     : `On ${formatLongDate(next.crush_date)} — ${labels}`;
 
+  const futureUpcoming = upcoming.filter(r => daysUntilCrush(r.crush_date) > 0);
+  const nextFuture = futureUpcoming.length > 0 ? futureUpcoming[0] : null;
+
+  let countdownHtml = '';
+  if (days > 0) {
+    countdownHtml = `<div id="countdown-display" style="margin-top: 14px; font-family: 'Courier New', monospace; font-size: 24px; font-weight: bold; background: rgba(0,0,0,0.15); padding: 8px 16px; border-radius: 6px; letter-spacing: 1px; display: inline-block;"></div>`;
+  } else if (days === 0 && nextFuture) {
+    countdownHtml = `
+      <div style="font-size: 11px; color: rgba(255,255,255,0.7); margin-top: 16px; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600;">Next Upcoming: ${formatLongDate(nextFuture.crush_date)}</div>
+      <div id="countdown-display" style="margin-top: 6px; font-family: 'Courier New', monospace; font-size: 24px; font-weight: bold; background: rgba(0,0,0,0.15); padding: 8px 16px; border-radius: 6px; letter-spacing: 1px; display: inline-block;"></div>
+    `;
+  }
+
   container.innerHTML = `
     <div class="next-crush-number" style="font-size: 48px; margin-bottom: 4px;">${headline}</div>
     <div class="next-crush-sub">${sub}</div>
-    <div id="countdown-display" style="margin-top: 14px; font-family: 'Courier New', monospace; font-size: 24px; font-weight: bold; background: rgba(0,0,0,0.15); padding: 8px 16px; border-radius: 6px; letter-spacing: 1px; display: inline-block;"></div>
+    ${countdownHtml}
   `;
 
-  // Parse "YYYY-MM-DD" safely in local time
-  const [y, m, d] = next.crush_date.split('-').map(Number);
-  
-  // If days > 0 (future), count down until the day begins (midnight of crush date).
-  // If days === 0 (today), count down until the day ends (23:59:59 of today)
-  let targetMs = new Date(y, m - 1, d, 0, 0, 0).getTime();
-  if (days === 0) {
-    targetMs = new Date(y, m - 1, d, 23, 59, 59, 999).getTime();
+  let targetDateStr = null;
+  if (days > 0) {
+    targetDateStr = next.crush_date;
+  } else if (days === 0 && nextFuture) {
+    targetDateStr = nextFuture.crush_date;
   }
-  
-  const updateCountdown = () => {
-    const now = new Date().getTime();
-    const diff = targetMs - now;
+
+  if (targetDateStr) {
+    // Parse "YYYY-MM-DD" safely in local time
+    const [y, m, d] = targetDateStr.split('-').map(Number);
+    const targetMs = new Date(y, m - 1, d, 0, 0, 0).getTime();
     
-    const display = document.getElementById('countdown-display');
-    if (!display) return;
+    const updateCountdown = () => {
+      const now = new Date().getTime();
+      const diff = targetMs - now;
+      
+      const display = document.getElementById('countdown-display');
+      if (!display) return;
+      
+      if (diff <= 0) {
+        display.innerText = "00h 00m 00s";
+        if (countdownTimer) clearInterval(countdownTimer);
+        return;
+      }
+      
+      const dd = Math.floor(diff / (1000 * 60 * 60 * 24));
+      const hh = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      const mm = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const ss = Math.floor((diff % (1000 * 60)) / 1000);
+      
+      if (dd > 0) {
+        display.innerText = `${dd}d ${String(hh).padStart(2, '0')}h ${String(mm).padStart(2, '0')}m ${String(ss).padStart(2, '0')}s`;
+      } else {
+        display.innerText = `${String(hh).padStart(2, '0')}h ${String(mm).padStart(2, '0')}m ${String(ss).padStart(2, '0')}s`;
+      }
+    };
     
-    if (diff <= 0) {
-      display.innerText = "00h 00m 00s";
-      if (countdownTimer) clearInterval(countdownTimer);
-      return;
-    }
-    
-    const dd = Math.floor(diff / (1000 * 60 * 60 * 24));
-    const hh = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-    const mm = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-    const ss = Math.floor((diff % (1000 * 60)) / 1000);
-    
-    if (dd > 0) {
-      display.innerText = `${dd}d ${String(hh).padStart(2, '0')}h ${String(mm).padStart(2, '0')}m ${String(ss).padStart(2, '0')}s`;
-    } else {
-      display.innerText = `${String(hh).padStart(2, '0')}h ${String(mm).padStart(2, '0')}m ${String(ss).padStart(2, '0')}s`;
-    }
-  };
-  
-  updateCountdown();
-  countdownTimer = setInterval(updateCountdown, 1000);
+    updateCountdown();
+    countdownTimer = setInterval(updateCountdown, 1000);
+  }
 }
 
 /** Formats an ISO date as "Saturday, 21st March, 2026" */
