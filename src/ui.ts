@@ -467,3 +467,38 @@ function escapeHtml(str: string): string {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
 }
+
+/** Shows skeleton loaders for the schedule table and next-crush card while data loads. */
+export function showSkeletons(): void {
+  // Next crush skeleton
+  const section = document.getElementById('next-crush-section');
+  const crushContainer = document.getElementById('next-crush-container');
+  if (section && crushContainer) {
+    section.style.display = '';
+    crushContainer.innerHTML = `
+      <div class="skeleton-next-crush" style="width:120px;height:52px;margin-bottom:10px;"></div>
+      <div class="skeleton-next-crush" style="width:220px;height:18px;"></div>
+    `;
+  }
+
+  // Schedule table skeleton
+  const tableContainer = document.getElementById('schedule-container');
+  if (!tableContainer) return;
+
+  const skeletonRow = (widths: string[]) =>
+    `<tr>${widths.map(w => `<td><span class="skeleton" style="width:${w};height:14px;"></span></td>`).join('')}</tr>`;
+
+  tableContainer.innerHTML = `
+    <table class="schedule-table">
+      <thead><tr>
+        <th></th><th>Sample</th><th>Cast Date</th><th>Crush Date</th><th>Duration</th><th>Days Left</th><th></th>
+      </tr></thead>
+      <tbody>
+        ${skeletonRow(['24px','90px','80px','80px','50px','60px','24px'])}
+        ${skeletonRow(['24px','120px','80px','80px','50px','60px','24px'])}
+        ${skeletonRow(['24px','70px','80px','80px','50px','60px','24px'])}
+        ${skeletonRow(['24px','100px','80px','80px','50px','60px','24px'])}
+      </tbody>
+    </table>
+  `;
+}

@@ -436,6 +436,26 @@
     tr.row--today:hover { background: #dcfce7; }
     tr.row--future { background: #fff; }
 
+    /* ── Skeleton Loader ── */
+    @keyframes skeleton-shimmer {
+      0% { background-position: -600px 0; }
+      100% { background-position: 600px 0; }
+    }
+    .skeleton {
+      background: linear-gradient(90deg, #e5e7eb 25%, #f3f4f6 50%, #e5e7eb 75%);
+      background-size: 600px 100%;
+      animation: skeleton-shimmer 1.4s infinite linear;
+      border-radius: 4px;
+      display: inline-block;
+    }
+    .skeleton-next-crush {
+      background: linear-gradient(90deg, rgba(255,255,255,0.15) 25%, rgba(255,255,255,0.3) 50%, rgba(255,255,255,0.15) 75%);
+      background-size: 600px 100%;
+      animation: skeleton-shimmer 1.4s infinite linear;
+      border-radius: 6px;
+      display: block;
+    }
+
     /* ── Empty State ── */
     .empty-state {
       text-align: center;
