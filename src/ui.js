@@ -24,7 +24,7 @@ document.addEventListener('click', (e) => {
         document.querySelectorAll('.dropdown-menu.show').forEach(m => m.classList.remove('show'));
     }
 });
-export function renderTable(rows, container, groupByName = false) {
+export function renderTable(rows, container, groupBy = 'none') {
     container.innerHTML = '';
     const pending = rows.filter(r => !r.is_crushed);
     const crushed = rows.filter(r => r.is_crushed);
@@ -96,7 +96,7 @@ export function renderTable(rows, container, groupByName = false) {
       `;
             return tr;
         }
-        if (groupByName) {
+        if (groupBy === 'name') {
             const groupedSorted = [...data].sort((a, b) => {
                 const nameCmp = a.sample_label.localeCompare(b.sample_label, undefined, { numeric: true, sensitivity: 'base' });
                 if (nameCmp !== 0)
@@ -112,6 +112,29 @@ export function renderTable(rows, container, groupByName = false) {
                     groupTr.innerHTML = `
             <td colspan="9" style="background: #e5e7eb; font-weight: bold; padding: 10px 14px; text-transform: uppercase; font-size: 11px; letter-spacing: 0.05em; color: #4b5563;">
               ${escapeHtml(currentGroup)}
+            </td>
+          `;
+                    tbody.appendChild(groupTr);
+                }
+                tbody.appendChild(createRow(row, rowIndex++));
+            }
+        }
+        else if (groupBy === 'date') {
+            const groupedSorted = [...data].sort((a, b) => {
+                if (a.crush_date !== b.crush_date) {
+                    return a.crush_date < b.crush_date ? -1 : 1;
+                }
+                return a.sample_label.localeCompare(b.sample_label, undefined, { numeric: true, sensitivity: 'base' });
+            });
+            let currentGroup = '';
+            let rowIndex = 1;
+            for (const row of groupedSorted) {
+                if (row.crush_date !== currentGroup) {
+                    currentGroup = row.crush_date;
+                    const groupTr = document.createElement('tr');
+                    groupTr.innerHTML = `
+            <td colspan="9" style="background: #e5e7eb; font-weight: bold; padding: 10px 14px; text-transform: uppercase; font-size: 11px; letter-spacing: 0.05em; color: #4b5563;">
+              ${escapeHtml(formatDisplayDate(currentGroup))}
             </td>
           `;
                     tbody.appendChild(groupTr);
@@ -415,4 +438,35 @@ function escapeHtml(str) {
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
+}
+/** Shows skeleton loaders for the schedule table and next-crush card while data loads. */
+export function showSkeletons() {
+    // Next crush skeleton
+    const section = document.getElementById('next-crush-section');
+    const crushContainer = document.getElementById('next-crush-container');
+    if (section && crushContainer) {
+        section.style.display = '';
+        crushContainer.innerHTML = `
+      <div class="skeleton-next-crush" style="width:120px;height:52px;margin-bottom:10px;"></div>
+      <div class="skeleton-next-crush" style="width:220px;height:18px;"></div>
+    `;
+    }
+    // Schedule table skeleton
+    const tableContainer = document.getElementById('schedule-container');
+    if (!tableContainer)
+        return;
+    const skeletonRow = (widths) => `<tr>${widths.map(w => `<td><span class="skeleton" style="width:${w};height:14px;"></span></td>`).join('')}</tr>`;
+    tableContainer.innerHTML = `
+    <table class="schedule-table">
+      <thead><tr>
+        <th></th><th>Sample</th><th>Cast Date</th><th>Crush Date</th><th>Duration</th><th>Days Left</th><th></th>
+      </tr></thead>
+      <tbody>
+        ${skeletonRow(['24px', '90px', '80px', '80px', '50px', '60px', '24px'])}
+        ${skeletonRow(['24px', '120px', '80px', '80px', '50px', '60px', '24px'])}
+        ${skeletonRow(['24px', '70px', '80px', '80px', '50px', '60px', '24px'])}
+        ${skeletonRow(['24px', '100px', '80px', '80px', '50px', '60px', '24px'])}
+      </tbody>
+    </table>
+  `;
 }

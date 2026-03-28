@@ -23,8 +23,8 @@ function afterMutation(): void {
   if (currentUserUid && !isSharedView) {
     saveToCloud(currentUserUid, state).catch(e => console.error("Cloud save failed", e));
   }
-  const cbGroup = document.getElementById('cb-group-by-name') as HTMLInputElement | null;
-  renderTable(state, getContainer(), cbGroup?.checked ?? false);
+  const selectGroup = document.getElementById('select-group-by') as HTMLSelectElement | null;
+  renderTable(state, getContainer(), (selectGroup?.value as 'none' | 'name' | 'date') || 'none');
   renderNextCrush(state);
   setExportButtonsDisabled(state.length === 0);
   const btn = document.getElementById('btn-batch-delete');
@@ -384,9 +384,9 @@ async function init(): Promise<void> {
     state = await load();
   }
 
-  const cbGroup = document.getElementById('cb-group-by-name') as HTMLInputElement | null;
+  const selectGroup = document.getElementById('select-group-by') as HTMLSelectElement | null;
   const container = getContainer();
-  renderTable(state, container, cbGroup?.checked ?? false);
+  renderTable(state, container, (selectGroup?.value as 'none' | 'name' | 'date') || 'none');
   renderNextCrush(state);
   setExportButtonsDisabled(state.length === 0);
 
@@ -453,8 +453,8 @@ async function init(): Promise<void> {
     if (e.target === addModal) addModal.style.display = 'none';
   });
 
-  cbGroup?.addEventListener('change', () => {
-    renderTable(state, getContainer(), cbGroup.checked);
+  selectGroup?.addEventListener('change', () => {
+    renderTable(state, getContainer(), (selectGroup.value as 'none' | 'name' | 'date') || 'none');
     const btn = document.getElementById('btn-batch-delete');
     if (btn) btn.style.display = 'none';
     const selectAll = document.getElementById('batch-delete-all') as HTMLInputElement | null;

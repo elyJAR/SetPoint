@@ -5,6 +5,7 @@ import { generatePDF } from './pdf';
 import { renderTable, renderFormRow, showBanner, setExportButtonsDisabled, renderNextCrush, showInfoModal } from './ui';
 import { requestNotificationPermission, updateLocalNotifications } from './notifications';
 import { isFirebaseConfigured, loginWithGoogle, logout, onAuthChange, saveToCloud, loadFromCloud, getSharedSchedule } from './firebase';
+import { Capacitor } from '@capacitor/core';
 let state = [];
 let currentUserUid = null;
 let isSharedView = false;
@@ -19,8 +20,8 @@ function afterMutation() {
     if (currentUserUid && !isSharedView) {
         saveToCloud(currentUserUid, state).catch(e => console.error("Cloud save failed", e));
     }
-    const cbGroup = document.getElementById('cb-group-by-name');
-    renderTable(state, getContainer(), cbGroup?.checked ?? false);
+    const selectGroup = document.getElementById('select-group-by');
+    renderTable(state, getContainer(), selectGroup?.value || 'none');
     renderNextCrush(state);
     setExportButtonsDisabled(state.length === 0);
     const btn = document.getElementById('btn-batch-delete');
@@ -310,6 +311,10 @@ function wireRemoveButton(row) {
 async function init() {
     await migrateFromLocalStorage();
     requestNotificationPermission();
+    if (Capacitor.isNativePlatform()) {
+        const { GoogleAuth } = await import('@codetrix-studio/capacitor-google-auth');
+        GoogleAuth.initialize();
+    }
     const params = new URLSearchParams(window.location.search);
     const shareId = params.get('share');
     if (shareId) {
@@ -333,9 +338,9 @@ async function init() {
     else {
         state = await load();
     }
-    const cbGroup = document.getElementById('cb-group-by-name');
+    const selectGroup = document.getElementById('select-group-by');
     const container = getContainer();
-    renderTable(state, container, cbGroup?.checked ?? false);
+    renderTable(state, container, selectGroup?.value || 'none');
     renderNextCrush(state);
     setExportButtonsDisabled(state.length === 0);
     wireTableActions(container);
@@ -401,8 +406,8 @@ async function init() {
         if (e.target === addModal)
             addModal.style.display = 'none';
     });
-    cbGroup?.addEventListener('change', () => {
-        renderTable(state, getContainer(), cbGroup.checked);
+    selectGroup?.addEventListener('change', () => {
+        renderTable(state, getContainer(), selectGroup.value || 'none');
         const btn = document.getElementById('btn-batch-delete');
         if (btn)
             btn.style.display = 'none';

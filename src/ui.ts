@@ -30,7 +30,7 @@ document.addEventListener('click', (e) => {
   }
 });
 
-export function renderTable(rows: ScheduleRow[], container: HTMLElement, groupByName = false): void {
+export function renderTable(rows: ScheduleRow[], container: HTMLElement, groupBy: 'none' | 'name' | 'date' = 'none'): void {
   container.innerHTML = '';
 
   const pending = rows.filter(r => !r.is_crushed);
@@ -111,7 +111,7 @@ export function renderTable(rows: ScheduleRow[], container: HTMLElement, groupBy
       return tr;
     }
 
-    if (groupByName) {
+    if (groupBy === 'name') {
       const groupedSorted = [...data].sort((a, b) => {
         const nameCmp = a.sample_label.localeCompare(b.sample_label, undefined, { numeric: true, sensitivity: 'base' });
         if (nameCmp !== 0) return nameCmp;
@@ -127,6 +127,29 @@ export function renderTable(rows: ScheduleRow[], container: HTMLElement, groupBy
           groupTr.innerHTML = `
             <td colspan="9" style="background: #e5e7eb; font-weight: bold; padding: 10px 14px; text-transform: uppercase; font-size: 11px; letter-spacing: 0.05em; color: #4b5563;">
               ${escapeHtml(currentGroup)}
+            </td>
+          `;
+          tbody.appendChild(groupTr);
+        }
+        tbody.appendChild(createRow(row, rowIndex++));
+      }
+    } else if (groupBy === 'date') {
+      const groupedSorted = [...data].sort((a, b) => {
+        if (a.crush_date !== b.crush_date) {
+          return a.crush_date < b.crush_date ? -1 : 1;
+        }
+        return a.sample_label.localeCompare(b.sample_label, undefined, { numeric: true, sensitivity: 'base' });
+      });
+
+      let currentGroup = '';
+      let rowIndex = 1;
+      for (const row of groupedSorted) {
+        if (row.crush_date !== currentGroup) {
+          currentGroup = row.crush_date;
+          const groupTr = document.createElement('tr');
+          groupTr.innerHTML = `
+            <td colspan="9" style="background: #e5e7eb; font-weight: bold; padding: 10px 14px; text-transform: uppercase; font-size: 11px; letter-spacing: 0.05em; color: #4b5563;">
+              ${escapeHtml(formatDisplayDate(currentGroup))}
             </td>
           `;
           tbody.appendChild(groupTr);

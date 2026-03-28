@@ -739,10 +739,11 @@
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
         <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
           <div class="card-title" style="margin-bottom: 0;">Crush Schedule</div>
-          <label style="font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 6px; cursor: pointer; color: #4b5563;">
-            <input type="checkbox" id="cb-group-by-name" style="width: 15px; height: 15px; accent-color: #2563eb;" />
-            Group by Name
-          </label>
+          <select id="select-group-by" style="font-size: 13px; font-weight: 500; cursor: pointer; color: #4b5563; border: 1px solid #d1d5db; border-radius: 4px; padding: 4px 8px; background: #fff; outline: none; transition: border-color 0.15s, box-shadow 0.15s;">
+            <option value="none">No Grouping</option>
+            <option value="name">Group by Name</option>
+            <option value="date">Group by Date</option>
+          </select>
         </div>
         <button id="btn-batch-delete" class="btn btn-danger btn-sm" style="display: none;">Batch Delete</button>
       </div>
