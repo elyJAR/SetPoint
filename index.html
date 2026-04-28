@@ -745,7 +745,10 @@
             <option value="date">Group by Date</option>
           </select>
         </div>
-        <button id="btn-batch-delete" class="btn btn-danger btn-sm" style="display: none;">Batch Delete</button>
+        <div style="display: flex; gap: 8px;">
+          <button id="btn-batch-mark" class="btn btn-primary btn-sm" style="display: none;">Mark as Crushed</button>
+          <button id="btn-batch-delete" class="btn btn-danger btn-sm" style="display: none;">Batch Delete</button>
+        </div>
       </div>
       <div id="schedule-container">
         <p class="empty-state">No samples yet. Add a sample above to get started.</p>
